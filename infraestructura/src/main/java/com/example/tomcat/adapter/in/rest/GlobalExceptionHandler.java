@@ -19,6 +19,8 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
@@ -91,6 +93,17 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleMissingParameter(MissingServletRequestParameterException ex) {
         return respuesta(HttpStatus.BAD_REQUEST,
                 "Falta el parámetro obligatorio '" + ex.getParameterName() + "'.");
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingPart(MissingServletRequestPartException ex) {
+        return respuesta(HttpStatus.BAD_REQUEST,
+                "Falta el archivo '" + ex.getRequestPartName() + "' en la petición (multipart/form-data).");
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleMaxUpload(MaxUploadSizeExceededException ex) {
+        return respuesta(HttpStatus.PAYLOAD_TOO_LARGE, "La imagen supera el tamaño máximo de 5 MB.");
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

@@ -6,11 +6,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 
 public interface SpringDataReservaRepository extends JpaRepository<ReservaEntity, Long> {
     List<ReservaEntity> findByClienteId(Long clienteId);
     List<ReservaEntity> findByHerramientaId(Long herramientaId);
+    List<ReservaEntity> findByEstadoInAndFechaInicioBefore(Collection<String> estados, LocalDate fecha);
 
     @Query("SELECT r FROM ReservaEntity r WHERE r.herramientaId IN :herramientaIds")
     List<ReservaEntity> findByHerramientaIdIn(@Param("herramientaIds") List<Long> herramientaIds);

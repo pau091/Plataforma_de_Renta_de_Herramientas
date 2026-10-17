@@ -39,4 +39,14 @@ public class CategoriaRepositoryAdapter implements CategoriaRepositoryPort {
     public Optional<Categoria> buscarPorId(Long id) {
         return repository.findById(id).map(mapper::toDomain);
     }
+
+    @Override
+    public Optional<Categoria> buscarPorNombre(String nombre) {
+        return repository.findFirstByNombreIgnoreCase(nombre).map(mapper::toDomain);
+    }
+
+    @Override
+    public void eliminar(Long id) {
+        repository.deleteById(id);
+    }
 }

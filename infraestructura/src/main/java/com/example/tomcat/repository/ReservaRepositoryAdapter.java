@@ -8,6 +8,7 @@ import com.example.tomcat.model.Reserva;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -66,6 +67,11 @@ public class ReservaRepositoryAdapter implements ReservaRepositoryPort {
     @Override
     public List<Reserva> listarPorHerramienta(Long herramientaId) {
         return reservaRepository.findByHerramientaId(herramientaId).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<Reserva> listarPorEstadosConInicioAntesDe(Collection<String> estados, LocalDate fecha) {
+        return reservaRepository.findByEstadoInAndFechaInicioBefore(estados, fecha).stream().map(mapper::toDomain).toList();
     }
 
     @Override

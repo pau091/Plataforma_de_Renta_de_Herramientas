@@ -50,6 +50,11 @@ public class HerramientaRepositoryAdapter implements HerramientaRepositoryPort {
     }
 
     @Override
+    public boolean existePorCategoria(Long categoriaId) {
+        return repository.existsByCategoriaId(categoriaId);
+    }
+
+    @Override
     public void eliminar(Long id) {
         repository.deleteById(id);
     }

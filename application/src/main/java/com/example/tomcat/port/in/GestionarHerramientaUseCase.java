@@ -18,6 +18,8 @@ public interface GestionarHerramientaUseCase {
     void eliminar(Solicitante solicitante, Long id);
     Herramienta cambiarEstado(Solicitante solicitante, Long id, String estado);
     Herramienta actualizarImagen(Solicitante solicitante, Long id, String imagenUrl);
+    /** Sube un archivo de imagen (JPG, PNG, WEBP o GIF, máx. 5 MB) y lo asigna a la herramienta. */
+    Herramienta subirImagen(Solicitante solicitante, Long id, byte[] contenido);
 
     // Consultas del catálogo: abiertas a cualquier usuario autenticado.
     List<Herramienta> listar();

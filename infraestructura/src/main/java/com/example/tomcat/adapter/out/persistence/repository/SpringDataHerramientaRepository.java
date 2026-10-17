@@ -8,4 +8,5 @@ import java.util.List;
 public interface SpringDataHerramientaRepository extends JpaRepository<HerramientaEntity, Long> {
     List<HerramientaEntity> findByEstado(String estado);
     List<HerramientaEntity> findByProveedorId(Long proveedorId);
+    boolean existsByCategoriaId(Long categoriaId);
 }

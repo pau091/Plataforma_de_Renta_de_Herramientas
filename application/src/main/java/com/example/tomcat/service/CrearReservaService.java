@@ -14,6 +14,7 @@ import com.example.tomcat.repository.HerramientaRepositoryPort;
 import com.example.tomcat.repository.ReservaRepositoryPort;
 import com.example.tomcat.repository.UsuarioRepositoryPort;
 
+import java.time.Clock;
 import java.time.LocalDate;
 
 public class CrearReservaService implements CrearReservaUseCase {
@@ -21,15 +22,18 @@ public class CrearReservaService implements CrearReservaUseCase {
     private final HerramientaRepositoryPort herramientaRepositoryPort;
     private final UsuarioRepositoryPort usuarioRepositoryPort;
     private final ReservaRepositoryPort reservaRepositoryPort;
+    private final Clock reloj;
 
     public CrearReservaService(
             HerramientaRepositoryPort herramientaRepositoryPort,
             UsuarioRepositoryPort usuarioRepositoryPort,
-            ReservaRepositoryPort reservaRepositoryPort
+            ReservaRepositoryPort reservaRepositoryPort,
+            Clock reloj
     ) {
         this.herramientaRepositoryPort = herramientaRepositoryPort;
         this.usuarioRepositoryPort = usuarioRepositoryPort;
         this.reservaRepositoryPort = reservaRepositoryPort;
+        this.reloj = reloj;
     }
 
     @Override
@@ -49,7 +53,7 @@ public class CrearReservaService implements CrearReservaUseCase {
         if (fechaInicio.isAfter(fechaFin)) {
             throw new DomainException("La fecha de inicio no puede ser posterior a la fecha fin.");
         }
-        if (fechaInicio.isBefore(LocalDate.now())) {
+        if (fechaInicio.isBefore(LocalDate.now(reloj))) {
             throw new DomainException("No se puede reservar con una fecha de inicio pasada.");
         }
         if (reservaRepositoryPort.existeSolape(herramientaId, fechaInicio, fechaFin, null)) {

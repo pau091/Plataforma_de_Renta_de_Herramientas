@@ -11,5 +11,6 @@ public interface HerramientaRepositoryPort {
     List<Herramienta> listarDisponibles();
     List<Herramienta> listarPorProveedor(Long proveedorId);
     Optional<Herramienta> buscarPorId(Long id);
+    boolean existePorCategoria(Long categoriaId);
     void eliminar(Long id);
 }

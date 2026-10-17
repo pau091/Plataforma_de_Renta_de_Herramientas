@@ -9,4 +9,6 @@ public interface CategoriaRepositoryPort {
     Categoria guardar(Categoria categoria);
     List<Categoria> listar();
     Optional<Categoria> buscarPorId(Long id);
+    Optional<Categoria> buscarPorNombre(String nombre);
+    void eliminar(Long id);
 }

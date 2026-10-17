@@ -10,10 +10,13 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -95,6 +98,14 @@ public class HerramientaController {
                                                         @PathVariable Long id,
                                                         @Valid @RequestBody ImagenRequest request) {
         return ResponseEntity.ok(gestionarHerramientaUseCase.actualizarImagen(usuario.solicitante(), id, request.imagenUrl()));
+    }
+
+    /** Sube el archivo de imagen de la herramienta (campo "archivo"; JPG, PNG, WEBP o GIF, máx. 5 MB). */
+    @PostMapping(value = "/{id}/imagen", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Herramienta> subirImagen(@AuthenticationPrincipal UsuarioAutenticado usuario,
+                                                   @PathVariable Long id,
+                                                   @RequestParam("archivo") MultipartFile archivo) throws IOException {
+        return ResponseEntity.ok(gestionarHerramientaUseCase.subirImagen(usuario.solicitante(), id, archivo.getBytes()));
     }
 
     @DeleteMapping("/{id}")

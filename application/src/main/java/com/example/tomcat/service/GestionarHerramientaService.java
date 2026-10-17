@@ -9,6 +9,7 @@ import com.example.tomcat.model.Rol;
 import com.example.tomcat.model.Usuario;
 import com.example.tomcat.port.in.GestionarHerramientaUseCase;
 import com.example.tomcat.port.in.dto.Solicitante;
+import com.example.tomcat.port.out.AlmacenamientoImagenPort;
 import com.example.tomcat.repository.CategoriaRepositoryPort;
 import com.example.tomcat.repository.HerramientaRepositoryPort;
 import com.example.tomcat.repository.MantenimientoRepositoryPort;
@@ -26,6 +27,7 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
     private final CategoriaRepositoryPort categoriaRepositoryPort;
     private final ReservaRepositoryPort reservaRepositoryPort;
     private final MantenimientoRepositoryPort mantenimientoRepositoryPort;
+    private final AlmacenamientoImagenPort almacenamientoImagenPort;
     private final ControlAcceso controlAcceso;
 
     public GestionarHerramientaService(
@@ -34,6 +36,7 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
             CategoriaRepositoryPort categoriaRepositoryPort,
             ReservaRepositoryPort reservaRepositoryPort,
             MantenimientoRepositoryPort mantenimientoRepositoryPort,
+            AlmacenamientoImagenPort almacenamientoImagenPort,
             ControlAcceso controlAcceso
     ) {
         this.herramientaRepositoryPort = herramientaRepositoryPort;
@@ -41,6 +44,7 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
         this.categoriaRepositoryPort = categoriaRepositoryPort;
         this.reservaRepositoryPort = reservaRepositoryPort;
         this.mantenimientoRepositoryPort = mantenimientoRepositoryPort;
+        this.almacenamientoImagenPort = almacenamientoImagenPort;
         this.controlAcceso = controlAcceso;
     }
 
@@ -105,8 +109,32 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
         if (imagenUrl == null || imagenUrl.isBlank()) {
             throw new DomainException("La URL de la imagen es obligatoria.");
         }
+        String anterior = herramienta.getImagenUrl();
         herramienta.actualizarImagen(imagenUrl.trim());
-        return herramientaRepositoryPort.guardar(herramienta);
+        Herramienta guardada = herramientaRepositoryPort.guardar(herramienta);
+        almacenamientoImagenPort.eliminarSiEsPropia(anterior);
+        return guardada;
+    }
+
+    @Override
+    public Herramienta subirImagen(Solicitante solicitante, Long id, byte[] contenido) {
+        Herramienta herramienta = buscarPropia(solicitante, id);
+        String extension = ValidadorImagen.extensionValida(contenido);
+
+        String anterior = herramienta.getImagenUrl();
+        String url = almacenamientoImagenPort.guardar(contenido, extension);
+        herramienta.actualizarImagen(url);
+        Herramienta guardada;
+        try {
+            guardada = herramientaRepositoryPort.guardar(herramienta);
+        } catch (RuntimeException e) {
+            // Si la base de datos falla, no se deja un archivo huérfano en disco.
+            almacenamientoImagenPort.eliminarSiEsPropia(url);
+            throw e;
+        }
+        // La imagen anterior se borra solo después de guardar la nueva, para no dejar la herramienta sin imagen.
+        almacenamientoImagenPort.eliminarSiEsPropia(anterior);
+        return guardada;
     }
 
     @Override

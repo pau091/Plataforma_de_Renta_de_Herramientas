@@ -3,7 +3,9 @@ package com.example.tomcat.config;
 import com.example.tomcat.port.in.AutenticarUsuarioUseCase;
 import com.example.tomcat.port.in.ConsultarDisponibilidadUseCase;
 import com.example.tomcat.port.in.ConsultarReportesUseCase;
+import com.example.tomcat.port.in.ConsultarPanelUseCase;
 import com.example.tomcat.port.in.CrearReservaUseCase;
+import com.example.tomcat.port.in.GestionarCategoriaUseCase;
 import com.example.tomcat.port.in.GestionarFacturaUseCase;
 import com.example.tomcat.port.in.GestionarHerramientaUseCase;
 import com.example.tomcat.port.in.GestionarMantenimientoUseCase;
@@ -12,6 +14,8 @@ import com.example.tomcat.port.in.GestionarUsuarioUseCase;
 import com.example.tomcat.port.in.ListarPagosUseCase;
 import com.example.tomcat.port.in.ProcesarPagoUseCase;
 import com.example.tomcat.port.in.RegistrarUsuarioUseCase;
+import com.example.tomcat.port.in.VencerReservasUseCase;
+import com.example.tomcat.port.out.AlmacenamientoImagenPort;
 import com.example.tomcat.port.out.PasswordHasherPort;
 import com.example.tomcat.repository.CategoriaRepositoryPort;
 import com.example.tomcat.repository.FacturaRepositoryPort;
@@ -22,9 +26,11 @@ import com.example.tomcat.repository.ReservaRepositoryPort;
 import com.example.tomcat.repository.UsuarioRepositoryPort;
 import com.example.tomcat.service.AutenticarUsuarioService;
 import com.example.tomcat.service.ConsultarDisponibilidadService;
+import com.example.tomcat.service.ConsultarPanelService;
 import com.example.tomcat.service.ConsultarReportesService;
 import com.example.tomcat.service.ControlAcceso;
 import com.example.tomcat.service.CrearReservaService;
+import com.example.tomcat.service.GestionarCategoriaService;
 import com.example.tomcat.service.GestionarFacturaService;
 import com.example.tomcat.service.GestionarHerramientaService;
 import com.example.tomcat.service.GestionarMantenimientoService;
@@ -33,9 +39,14 @@ import com.example.tomcat.service.GestionarUsuarioService;
 import com.example.tomcat.service.ListarPagosService;
 import com.example.tomcat.service.ProcesarPagoService;
 import com.example.tomcat.service.RegistrarUsuarioService;
+import com.example.tomcat.service.VencerReservasService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
+
+import java.time.Clock;
+import java.time.ZoneId;
 
 /**
  * Crea los casos de uso de la capa application (que no conoce Spring) y los envuelve en
@@ -51,6 +62,12 @@ public class BeanConfig {
 
     public BeanConfig(PlatformTransactionManager transactionManager) {
         this.tx = transactionManager;
+    }
+
+    /** Reloj con la zona horaria del negocio: define qué día es "hoy" para reservas y vencimientos. */
+    @Bean
+    public Clock reloj(@Value("${app.zona-horaria}") String zonaHoraria) {
+        return Clock.system(ZoneId.of(zonaHoraria));
     }
 
     @Bean
@@ -95,11 +112,12 @@ public class BeanConfig {
             CategoriaRepositoryPort categoriaRepository,
             ReservaRepositoryPort reservaRepository,
             MantenimientoRepositoryPort mantenimientoRepository,
+            AlmacenamientoImagenPort almacenamientoImagenPort,
             ControlAcceso controlAcceso
     ) {
         return TransaccionalProxy.envolver(GestionarHerramientaUseCase.class,
                 new GestionarHerramientaService(herramientaRepository, usuarioRepository, categoriaRepository,
-                        reservaRepository, mantenimientoRepository, controlAcceso),
+                        reservaRepository, mantenimientoRepository, almacenamientoImagenPort, controlAcceso),
                 tx, ESCRITURA);
     }
 
@@ -107,10 +125,45 @@ public class BeanConfig {
     public CrearReservaUseCase crearReservaUseCase(
             HerramientaRepositoryPort herramientaRepository,
             UsuarioRepositoryPort usuarioRepository,
-            ReservaRepositoryPort reservaRepository
+            ReservaRepositoryPort reservaRepository,
+            Clock reloj
     ) {
         return TransaccionalProxy.envolver(CrearReservaUseCase.class,
-                new CrearReservaService(herramientaRepository, usuarioRepository, reservaRepository), tx, ESCRITURA);
+                new CrearReservaService(herramientaRepository, usuarioRepository, reservaRepository, reloj), tx, ESCRITURA);
+    }
+
+    @Bean
+    public VencerReservasUseCase vencerReservasUseCase(
+            ReservaRepositoryPort reservaRepository,
+            PagoRepositoryPort pagoRepository,
+            Clock reloj
+    ) {
+        return TransaccionalProxy.envolver(VencerReservasUseCase.class,
+                new VencerReservasService(reservaRepository, pagoRepository, reloj), tx, ESCRITURA);
+    }
+
+    @Bean
+    public GestionarCategoriaUseCase gestionarCategoriaUseCase(
+            CategoriaRepositoryPort categoriaRepository,
+            HerramientaRepositoryPort herramientaRepository
+    ) {
+        return TransaccionalProxy.envolver(GestionarCategoriaUseCase.class,
+                new GestionarCategoriaService(categoriaRepository, herramientaRepository), tx, ESCRITURA);
+    }
+
+    @Bean
+    public ConsultarPanelUseCase consultarPanelUseCase(
+            UsuarioRepositoryPort usuarioRepository,
+            HerramientaRepositoryPort herramientaRepository,
+            ReservaRepositoryPort reservaRepository,
+            PagoRepositoryPort pagoRepository,
+            FacturaRepositoryPort facturaRepository,
+            MantenimientoRepositoryPort mantenimientoRepository
+    ) {
+        return TransaccionalProxy.envolver(ConsultarPanelUseCase.class,
+                new ConsultarPanelService(usuarioRepository, herramientaRepository, reservaRepository,
+                        pagoRepository, facturaRepository, mantenimientoRepository),
+                tx, LECTURA);
     }
 
     @Bean

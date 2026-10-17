@@ -120,7 +120,7 @@ public class ConsultarReportesService implements ConsultarReportesUseCase {
 
     private List<Reserva> reservasActivas() {
         return reservaRepositoryPort.listar().stream()
-                .filter(reserva -> !"RECHAZADA".equals(reserva.getEstado()))
+                .filter(reserva -> !"RECHAZADA".equals(reserva.getEstado()) && !"VENCIDA".equals(reserva.getEstado()))
                 .toList();
     }
 

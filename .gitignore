@@ -33,3 +33,6 @@ build/
 
 ### Secretos ###
 .env
+
+### Imagenes subidas en desarrollo local ###
+uploads/

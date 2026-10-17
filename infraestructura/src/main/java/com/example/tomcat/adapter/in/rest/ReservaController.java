@@ -5,9 +5,9 @@ import com.example.tomcat.model.Reserva;
 import com.example.tomcat.port.in.ConsultarDisponibilidadUseCase;
 import com.example.tomcat.port.in.CrearReservaUseCase;
 import com.example.tomcat.port.in.GestionarReservaUseCase;
+import com.example.tomcat.port.in.VencerReservasUseCase;
 import com.example.tomcat.security.UsuarioAutenticado;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -26,15 +26,18 @@ public class ReservaController {
     private final CrearReservaUseCase crearReservaUseCase;
     private final GestionarReservaUseCase gestionarReservaUseCase;
     private final ConsultarDisponibilidadUseCase consultarDisponibilidadUseCase;
+    private final VencerReservasUseCase vencerReservasUseCase;
 
     public ReservaController(
             CrearReservaUseCase crearReservaUseCase,
             GestionarReservaUseCase gestionarReservaUseCase,
-            ConsultarDisponibilidadUseCase consultarDisponibilidadUseCase
+            ConsultarDisponibilidadUseCase consultarDisponibilidadUseCase,
+            VencerReservasUseCase vencerReservasUseCase
     ) {
         this.crearReservaUseCase = crearReservaUseCase;
         this.gestionarReservaUseCase = gestionarReservaUseCase;
         this.consultarDisponibilidadUseCase = consultarDisponibilidadUseCase;
+        this.vencerReservasUseCase = vencerReservasUseCase;
     }
 
     /** La reserva queda PENDIENTE hasta que el proveedor la acepte o la rechace. */
@@ -89,6 +92,15 @@ public class ReservaController {
                 usuario.solicitante(), id, request.estadoEquipo(), request.observaciones()));
     }
 
+    /**
+     * Solo ADMIN: ejecuta ya el vencimiento que normalmente corre cada noche.
+     * Devuelve las reservas que pasaron a VENCIDA.
+     */
+    @PostMapping("/vencer")
+    public ResponseEntity<List<Reserva>> vencer() {
+        return ResponseEntity.ok(vencerReservasUseCase.vencerReservas());
+    }
+
     @GetMapping("/disponibilidad")
     public ResponseEntity<List<Herramienta>> disponibles(
             @RequestParam LocalDate fechaInicio,
@@ -112,8 +124,8 @@ public class ReservaController {
             Long clienteId,
             @NotNull(message = "La herramienta es obligatoria.")
             Long herramientaId,
+            // Que no sea pasada lo valida CrearReservaService con el reloj de app.zona-horaria.
             @NotNull(message = "La fecha de inicio es obligatoria.")
-            @FutureOrPresent(message = "La fecha de inicio no puede ser pasada.")
             LocalDate fechaInicio,
             @NotNull(message = "La fecha fin es obligatoria.")
             LocalDate fechaFin

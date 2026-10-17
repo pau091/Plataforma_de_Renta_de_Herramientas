@@ -79,6 +79,17 @@ public class Reserva {
         this.estado = "FINALIZADA";
     }
 
+    /**
+     * Una reserva vence cuando llega su fecha de inicio sin haberse concretado: el proveedor nunca
+     * la respondió (PENDIENTE) o fue aceptada pero no se pagó. Al vencer libera esas fechas.
+     */
+    public void vencer() {
+        if (!"PENDIENTE".equals(estado) && !"ACEPTADA".equals(estado)) {
+            throw new DomainException("Solo pueden vencer reservas pendientes o aceptadas sin entregar.");
+        }
+        this.estado = "VENCIDA";
+    }
+
     public boolean permitePago() {
         return "ACEPTADA".equals(estado) || "ENTREGADA".equals(estado) || "FINALIZADA".equals(estado);
     }

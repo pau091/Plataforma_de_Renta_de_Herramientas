@@ -45,6 +45,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/", "/index.html", "/app.js", "/favicon.ico",
                                  "/css/**", "/js/**", "/images/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/error").permitAll()
@@ -55,9 +56,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, "/api/herramientas/**").hasAnyRole("ADMIN", "PROVEEDOR")
                 .requestMatchers(HttpMethod.GET, "/api/herramientas/**").hasAnyRole("ADMIN", "PROVEEDOR", "CLIENTE")
                 .requestMatchers(HttpMethod.GET, "/api/categorias/**").hasAnyRole("ADMIN", "PROVEEDOR", "CLIENTE")
+                .requestMatchers("/api/categorias/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/reservas/*/aceptar", "/api/reservas/*/rechazar",
                                  "/api/reservas/*/entregar", "/api/reservas/*/devolver")
                     .hasAnyRole("ADMIN", "PROVEEDOR")
+                .requestMatchers(HttpMethod.POST, "/api/reservas/vencer").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/reservas").hasAnyRole("ADMIN", "CLIENTE")
                 .requestMatchers("/api/reservas/**").hasAnyRole("ADMIN", "PROVEEDOR", "CLIENTE")
                 .requestMatchers(HttpMethod.POST, "/api/pagos").hasAnyRole("ADMIN", "CLIENTE")
@@ -65,6 +68,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/facturas/**").hasAnyRole("ADMIN", "PROVEEDOR", "CLIENTE")
                 .requestMatchers("/api/reportes/**").hasRole("ADMIN")
                 .requestMatchers("/api/mantenimientos/**").hasAnyRole("ADMIN", "PROVEEDOR")
+                .requestMatchers("/api/panel").authenticated()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

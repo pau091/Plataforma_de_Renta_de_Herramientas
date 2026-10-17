@@ -29,6 +29,11 @@ services:
       - DB_URL=jdbc:mysql://mysql:3306/renta_herramientas_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       - DB_USERNAME=mysql
       - DB_PASSWORD=mysql
+      - APP_UPLOADS_DIR=/usr/local/tomcat/uploads
+      - APP_ZONA_HORARIA=America/Bogota
+    volumes:
+      # Las imágenes subidas se conservan aunque se reconstruya el contenedor.
+      - uploads:/usr/local/tomcat/uploads
     depends_on:
       mysql:
         condition: service_healthy
@@ -36,3 +41,4 @@ services:
 
 volumes:
   mysqldata:
+  uploads:
