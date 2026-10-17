@@ -1,0 +1,36 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: mysql_rentas
+    environment:
+      MYSQL_DATABASE: renta_herramientas_db
+      MYSQL_USER: mysql
+      MYSQL_PASSWORD: mysql
+      MYSQL_ROOT_PASSWORD: mysql
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysqldata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-umysql", "-pmysql"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+
+  tomcat:
+    build: .
+    container_name: tomcat_rentas
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_URL=jdbc:mysql://mysql:3306/renta_herramientas_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      - DB_USERNAME=mysql
+      - DB_PASSWORD=mysql
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: always
+
+volumes:
+  mysqldata:
