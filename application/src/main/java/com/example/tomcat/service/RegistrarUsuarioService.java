@@ -1,5 +1,6 @@
 package com.example.tomcat.service;
 
+import com.example.tomcat.exception.AccesoDenegadoException;
 import com.example.tomcat.exception.DomainException;
 import com.example.tomcat.model.Rol;
 import com.example.tomcat.model.Usuario;
@@ -19,7 +20,24 @@ public class RegistrarUsuarioService implements RegistrarUsuarioUseCase {
     }
 
     @Override
+    public Usuario registrarCliente(String nombre, String email, String password, String rolSolicitado) {
+        if (rolSolicitado != null && !rolSolicitado.isBlank() && Rol.desde(rolSolicitado) != Rol.CLIENTE) {
+            throw new AccesoDenegadoException(
+                    "El registro público solo permite cuentas de CLIENTE. Los proveedores los registra el administrador.");
+        }
+        return crear(nombre, email, password, Rol.CLIENTE);
+    }
+
+    @Override
     public Usuario registrar(String nombre, String email, String password, String rol) {
+        Rol rolUsuario = Rol.desde(rol);
+        if (rolUsuario == Rol.ADMIN) {
+            throw new DomainException("No está permitido registrar un administrador por este medio.");
+        }
+        return crear(nombre, email, password, rolUsuario);
+    }
+
+    private Usuario crear(String nombre, String email, String password, Rol rol) {
         if (nombre == null || nombre.isBlank()) {
             throw new DomainException("El nombre es obligatorio.");
         }
@@ -27,12 +45,6 @@ public class RegistrarUsuarioService implements RegistrarUsuarioUseCase {
         if (password == null || password.length() < 8) {
             throw new DomainException("La contraseña debe tener al menos 8 caracteres.");
         }
-
-        Rol rolUsuario = Rol.desde(rol);
-        if (rolUsuario == Rol.ADMIN) {
-            throw new DomainException("No está permitido registrar un administrador por este medio.");
-        }
-
         if (usuarioRepositoryPort.buscarPorEmail(correo.getValor()).isPresent()) {
             throw new DomainException("El correo ya se encuentra registrado.");
         }
@@ -44,7 +56,7 @@ public class RegistrarUsuarioService implements RegistrarUsuarioUseCase {
                 passwordHasherPort.hash(password),
                 true,
                 null,
-                rolUsuario
+                rol
         );
         return usuarioRepositoryPort.guardar(nuevoUsuario);
     }

@@ -20,10 +20,16 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final CorsConfigurationSource corsConfigurationSource;
+    private final JsonSecurityErrorHandler jsonSecurityErrorHandler;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, CorsConfigurationSource corsConfigurationSource) {
+    public SecurityConfig(
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            CorsConfigurationSource corsConfigurationSource,
+            JsonSecurityErrorHandler jsonSecurityErrorHandler
+    ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.corsConfigurationSource = corsConfigurationSource;
+        this.jsonSecurityErrorHandler = jsonSecurityErrorHandler;
     }
 
     @Bean
@@ -32,12 +38,16 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(jsonSecurityErrorHandler)
+                .accessDeniedHandler(jsonSecurityErrorHandler))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/", "/index.html", "/app.js", "/favicon.ico",
                                  "/css/**", "/js/**", "/images/**").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
+                .requestMatchers("/error").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/usuarios/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/herramientas/**").hasAnyRole("ADMIN", "PROVEEDOR")

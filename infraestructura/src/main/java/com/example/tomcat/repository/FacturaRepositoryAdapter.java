@@ -6,6 +6,7 @@ import com.example.tomcat.adapter.out.persistence.repository.SpringDataFacturaRe
 import com.example.tomcat.model.Factura;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,5 +53,13 @@ public class FacturaRepositoryAdapter implements FacturaRepositoryPort {
     @Override
     public List<Factura> listarPorCliente(Long clienteId) {
         return repository.findByClienteId(clienteId).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<Factura> listarPorHerramientas(Collection<Long> herramientaIds) {
+        if (herramientaIds.isEmpty()) {
+            return List.of();
+        }
+        return repository.findByHerramientaIdIn(herramientaIds).stream().map(mapper::toDomain).toList();
     }
 }

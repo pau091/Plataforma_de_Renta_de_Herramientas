@@ -4,6 +4,8 @@ import com.example.tomcat.adapter.in.rest.dto.UsuarioResponse;
 import com.example.tomcat.exception.DomainException;
 import com.example.tomcat.model.Usuario;
 import com.example.tomcat.port.in.GestionarUsuarioUseCase;
+import com.example.tomcat.port.in.RegistrarUsuarioUseCase;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,9 +17,22 @@ import java.util.List;
 public class UsuarioController {
 
     private final GestionarUsuarioUseCase gestionarUsuarioUseCase;
+    private final RegistrarUsuarioUseCase registrarUsuarioUseCase;
 
-    public UsuarioController(GestionarUsuarioUseCase gestionarUsuarioUseCase) {
+    public UsuarioController(GestionarUsuarioUseCase gestionarUsuarioUseCase, RegistrarUsuarioUseCase registrarUsuarioUseCase) {
         this.gestionarUsuarioUseCase = gestionarUsuarioUseCase;
+        this.registrarUsuarioUseCase = registrarUsuarioUseCase;
+    }
+
+    /** Solo ADMIN (ver SecurityConfig): da de alta proveedores o clientes. */
+    @PostMapping
+    public ResponseEntity<UsuarioResponse> crear(@RequestBody CrearUsuarioRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(UsuarioResponse.from(registrarUsuarioUseCase.registrar(
+                request.nombre(),
+                request.email(),
+                request.password(),
+                request.rol()
+        )));
     }
 
     @GetMapping
@@ -72,6 +87,8 @@ public class UsuarioController {
         }
         throw new DomainException("Solo se pueden listar clientes y proveedores.");
     }
+
+    public record CrearUsuarioRequest(String nombre, String email, String password, String rol) {}
 
     public record ActualizarUsuarioRequest(String nombre, String email, Boolean activo, String password) {}
 }

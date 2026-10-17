@@ -1,17 +1,19 @@
 package com.example.tomcat.port.in;
 
 import com.example.tomcat.model.Reserva;
+import com.example.tomcat.port.in.dto.Solicitante;
 
 import java.util.List;
 
 public interface GestionarReservaUseCase {
-    List<Reserva> listar();
-    List<Reserva> listarPorCliente(Long clienteId);
-    List<Reserva> listarPorProveedor(Long proveedorId);
-    List<Reserva> listarPorHerramienta(Long herramientaId);
-    Reserva buscarPorId(Long id);
-    Reserva aceptar(Long id);
-    Reserva rechazar(Long id);
-    Reserva entregar(Long id);
-    Reserva devolver(Long id, String estadoEquipo, String observaciones);
+    /**
+     * Lista según el rol: ADMIN ve todas, PROVEEDOR las de sus herramientas y CLIENTE las suyas.
+     * Los filtros opcionales solo acotan dentro de ese alcance.
+     */
+    List<Reserva> listar(Solicitante solicitante, Long clienteId, Long proveedorId, Long herramientaId);
+    Reserva buscarPorId(Solicitante solicitante, Long id);
+    Reserva aceptar(Solicitante solicitante, Long id);
+    Reserva rechazar(Solicitante solicitante, Long id);
+    Reserva entregar(Solicitante solicitante, Long id);
+    Reserva devolver(Solicitante solicitante, Long id, String estadoEquipo, String observaciones);
 }

@@ -1,7 +1,7 @@
 package com.example.tomcat.service;
 
 import com.example.tomcat.exception.AuthenticationFailedException;
-import com.example.tomcat.exception.DomainException;
+import com.example.tomcat.exception.UsuarioInactivoException;
 import com.example.tomcat.model.Usuario;
 import com.example.tomcat.port.in.AutenticarUsuarioUseCase;
 import com.example.tomcat.port.out.PasswordHasherPort;
@@ -28,12 +28,13 @@ public class AutenticarUsuarioService implements AutenticarUsuarioUseCase {
         Usuario usuario = usuarioRepositoryPort.buscarPorEmail(correo.getValor())
                 .orElseThrow(() -> new AuthenticationFailedException("Credenciales inválidas."));
 
-        if (!usuario.isActivo()) {
-            throw new DomainException("El usuario está inactivo.");
-        }
-
+        // Primero la contraseña: así no se revela si una cuenta existe o está inactiva sin conocer sus credenciales.
         if (!passwordHasherPort.matches(password, usuario.getPassword())) {
             throw new AuthenticationFailedException("Credenciales inválidas.");
+        }
+
+        if (!usuario.isActivo()) {
+            throw new UsuarioInactivoException();
         }
 
         return usuario;

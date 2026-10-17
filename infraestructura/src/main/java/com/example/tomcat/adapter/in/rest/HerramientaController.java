@@ -2,7 +2,10 @@ package com.example.tomcat.adapter.in.rest;
 
 import com.example.tomcat.model.Herramienta;
 import com.example.tomcat.port.in.GestionarHerramientaUseCase;
+import com.example.tomcat.security.UsuarioAutenticado;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -32,14 +35,23 @@ public class HerramientaController {
         return ResponseEntity.ok(gestionarHerramientaUseCase.listar());
     }
 
+    /** Inventario del proveedor autenticado. */
+    @GetMapping("/mias")
+    public ResponseEntity<List<Herramienta>> listarMias(@AuthenticationPrincipal UsuarioAutenticado usuario) {
+        return ResponseEntity.ok(gestionarHerramientaUseCase.listarPorProveedor(usuario.id()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Herramienta> obtener(@PathVariable Long id) {
         return ResponseEntity.ok(gestionarHerramientaUseCase.buscarPorId(id));
     }
 
     @PostMapping
-    public ResponseEntity<Herramienta> crear(@RequestBody HerramientaRequest request) {
-        return ResponseEntity.ok(gestionarHerramientaUseCase.crear(
+    public ResponseEntity<Herramienta> crear(@AuthenticationPrincipal UsuarioAutenticado usuario,
+                                             @RequestBody HerramientaRequest request) {
+        // proveedorId solo se usa cuando quien registra es ADMIN; un PROVEEDOR siempre registra a su nombre.
+        return ResponseEntity.status(HttpStatus.CREATED).body(gestionarHerramientaUseCase.crear(
+                usuario.solicitante(),
                 request.proveedorId(),
                 request.categoriaId(),
                 request.nombre(),
@@ -50,8 +62,11 @@ public class HerramientaController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Herramienta> actualizar(@PathVariable Long id, @RequestBody HerramientaRequest request) {
+    public ResponseEntity<Herramienta> actualizar(@AuthenticationPrincipal UsuarioAutenticado usuario,
+                                                  @PathVariable Long id,
+                                                  @RequestBody HerramientaRequest request) {
         return ResponseEntity.ok(gestionarHerramientaUseCase.actualizar(
+                usuario.solicitante(),
                 id,
                 request.categoriaId(),
                 request.nombre(),
@@ -63,18 +78,22 @@ public class HerramientaController {
     }
 
     @PatchMapping("/{id}/estado")
-    public ResponseEntity<Herramienta> cambiarEstado(@PathVariable Long id, @RequestBody EstadoRequest request) {
-        return ResponseEntity.ok(gestionarHerramientaUseCase.cambiarEstado(id, request.estado()));
+    public ResponseEntity<Herramienta> cambiarEstado(@AuthenticationPrincipal UsuarioAutenticado usuario,
+                                                     @PathVariable Long id,
+                                                     @RequestBody EstadoRequest request) {
+        return ResponseEntity.ok(gestionarHerramientaUseCase.cambiarEstado(usuario.solicitante(), id, request.estado()));
     }
 
     @PatchMapping("/{id}/imagen")
-    public ResponseEntity<Herramienta> actualizarImagen(@PathVariable Long id, @RequestBody ImagenRequest request) {
-        return ResponseEntity.ok(gestionarHerramientaUseCase.actualizarImagen(id, request.imagenUrl()));
+    public ResponseEntity<Herramienta> actualizarImagen(@AuthenticationPrincipal UsuarioAutenticado usuario,
+                                                        @PathVariable Long id,
+                                                        @RequestBody ImagenRequest request) {
+        return ResponseEntity.ok(gestionarHerramientaUseCase.actualizarImagen(usuario.solicitante(), id, request.imagenUrl()));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
-        gestionarHerramientaUseCase.eliminar(id);
+    public ResponseEntity<Void> eliminar(@AuthenticationPrincipal UsuarioAutenticado usuario, @PathVariable Long id) {
+        gestionarHerramientaUseCase.eliminar(usuario.solicitante(), id);
         return ResponseEntity.noContent().build();
     }
 

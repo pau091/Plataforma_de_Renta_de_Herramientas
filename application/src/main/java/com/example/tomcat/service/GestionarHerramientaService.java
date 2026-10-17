@@ -1,10 +1,12 @@
 package com.example.tomcat.service;
 
+import com.example.tomcat.exception.AccesoDenegadoException;
 import com.example.tomcat.exception.DomainException;
 import com.example.tomcat.model.Herramienta;
 import com.example.tomcat.model.Rol;
 import com.example.tomcat.model.Usuario;
 import com.example.tomcat.port.in.GestionarHerramientaUseCase;
+import com.example.tomcat.port.in.dto.Solicitante;
 import com.example.tomcat.repository.CategoriaRepositoryPort;
 import com.example.tomcat.repository.HerramientaRepositoryPort;
 import com.example.tomcat.repository.UsuarioRepositoryPort;
@@ -18,27 +20,31 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
     private final HerramientaRepositoryPort herramientaRepositoryPort;
     private final UsuarioRepositoryPort usuarioRepositoryPort;
     private final CategoriaRepositoryPort categoriaRepositoryPort;
+    private final ControlAcceso controlAcceso;
 
     public GestionarHerramientaService(
             HerramientaRepositoryPort herramientaRepositoryPort,
             UsuarioRepositoryPort usuarioRepositoryPort,
-            CategoriaRepositoryPort categoriaRepositoryPort
+            CategoriaRepositoryPort categoriaRepositoryPort,
+            ControlAcceso controlAcceso
     ) {
         this.herramientaRepositoryPort = herramientaRepositoryPort;
         this.usuarioRepositoryPort = usuarioRepositoryPort;
         this.categoriaRepositoryPort = categoriaRepositoryPort;
+        this.controlAcceso = controlAcceso;
     }
 
     @Override
-    public Herramienta crear(Long proveedorId, Long categoriaId, String nombre, String descripcion, BigDecimal tarifaDiaria, String imagenUrl) {
-        validarProveedor(proveedorId);
+    public Herramienta crear(Solicitante solicitante, Long proveedorId, Long categoriaId, String nombre, String descripcion,
+                             BigDecimal tarifaDiaria, String imagenUrl) {
+        Long dueno = resolverProveedor(solicitante, proveedorId);
         validarCategoria(categoriaId);
         validarNombre(nombre);
         Dinero tarifa = new Dinero(tarifaDiaria);
 
         Herramienta herramienta = new Herramienta(
                 null,
-                proveedorId,
+                dueno,
                 categoriaId,
                 nombre.trim(),
                 descripcion,
@@ -50,8 +56,9 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
     }
 
     @Override
-    public Herramienta actualizar(Long id, Long categoriaId, String nombre, String descripcion, BigDecimal tarifaDiaria, String estado, String imagenUrl) {
-        Herramienta herramienta = buscarPorId(id);
+    public Herramienta actualizar(Solicitante solicitante, Long id, Long categoriaId, String nombre, String descripcion,
+                                  BigDecimal tarifaDiaria, String estado, String imagenUrl) {
+        Herramienta herramienta = buscarPropia(solicitante, id);
         Long categoria = categoriaId != null ? categoriaId : herramienta.getCategoriaId();
         validarCategoria(categoria);
         String nombreActualizado = (nombre == null || nombre.isBlank()) ? herramienta.getNombre() : nombre.trim();
@@ -62,21 +69,21 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
     }
 
     @Override
-    public void eliminar(Long id) {
-        buscarPorId(id);
+    public void eliminar(Solicitante solicitante, Long id) {
+        buscarPropia(solicitante, id);
         herramientaRepositoryPort.eliminar(id);
     }
 
     @Override
-    public Herramienta cambiarEstado(Long id, String estado) {
-        Herramienta herramienta = buscarPorId(id);
+    public Herramienta cambiarEstado(Solicitante solicitante, Long id, String estado) {
+        Herramienta herramienta = buscarPropia(solicitante, id);
         herramienta.cambiarEstado(estado);
         return herramientaRepositoryPort.guardar(herramienta);
     }
 
     @Override
-    public Herramienta actualizarImagen(Long id, String imagenUrl) {
-        Herramienta herramienta = buscarPorId(id);
+    public Herramienta actualizarImagen(Solicitante solicitante, Long id, String imagenUrl) {
+        Herramienta herramienta = buscarPropia(solicitante, id);
         if (imagenUrl == null || imagenUrl.isBlank()) {
             throw new DomainException("La URL de la imagen es obligatoria.");
         }
@@ -105,12 +112,29 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
                 .orElseThrow(() -> new DomainException("La herramienta no existe."));
     }
 
-    private void validarProveedor(Long proveedorId) {
+    private Herramienta buscarPropia(Solicitante solicitante, Long id) {
+        Herramienta herramienta = buscarPorId(id);
+        controlAcceso.verificarPropietarioHerramienta(solicitante, herramienta);
+        return herramienta;
+    }
+
+    private Long resolverProveedor(Solicitante solicitante, Long proveedorId) {
+        if (solicitante.esProveedor()) {
+            // El proveedor siempre registra a su propio nombre, sin importar lo que envíe en la petición.
+            return solicitante.id();
+        }
+        if (!solicitante.esAdmin()) {
+            throw new AccesoDenegadoException("Solo proveedores o administradores pueden registrar herramientas.");
+        }
+        if (proveedorId == null) {
+            throw new DomainException("Debe indicar el proveedorId del dueño de la herramienta.");
+        }
         Usuario proveedor = usuarioRepositoryPort.buscarPorId(proveedorId)
                 .orElseThrow(() -> new DomainException("El proveedor no existe."));
-        if (proveedor.getRol() != Rol.PROVEEDOR && proveedor.getRol() != Rol.ADMIN) {
-            throw new DomainException("El usuario no puede registrar herramientas.");
+        if (proveedor.getRol() != Rol.PROVEEDOR) {
+            throw new DomainException("El usuario indicado no es un proveedor.");
         }
+        return proveedorId;
     }
 
     private void validarCategoria(Long categoriaId) {

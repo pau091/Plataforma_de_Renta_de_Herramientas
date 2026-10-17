@@ -2,6 +2,7 @@ package com.example.tomcat.repository;
 
 import com.example.tomcat.model.Factura;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -12,4 +13,5 @@ public interface FacturaRepositoryPort {
     Optional<Factura> buscarPorReservaId(Long reservaId);
     List<Factura> listar();
     List<Factura> listarPorCliente(Long clienteId);
+    List<Factura> listarPorHerramientas(Collection<Long> herramientaIds);
 }

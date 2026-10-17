@@ -6,6 +6,7 @@ import com.example.tomcat.adapter.out.persistence.repository.SpringDataPagoRepos
 import com.example.tomcat.model.Pago;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,6 +43,14 @@ public class PagoRepositoryAdapter implements PagoRepositoryPort {
     @Override
     public List<Pago> listarPorReserva(Long reservaId) {
         return repository.findByReservaId(reservaId).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public List<Pago> listarPorReservas(Collection<Long> reservaIds) {
+        if (reservaIds.isEmpty()) {
+            return List.of();
+        }
+        return repository.findByReservaIdIn(reservaIds).stream().map(mapper::toDomain).toList();
     }
 
     @Override

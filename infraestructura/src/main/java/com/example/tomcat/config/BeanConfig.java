@@ -23,6 +23,7 @@ import com.example.tomcat.repository.UsuarioRepositoryPort;
 import com.example.tomcat.service.AutenticarUsuarioService;
 import com.example.tomcat.service.ConsultarDisponibilidadService;
 import com.example.tomcat.service.ConsultarReportesService;
+import com.example.tomcat.service.ControlAcceso;
 import com.example.tomcat.service.CrearReservaService;
 import com.example.tomcat.service.GestionarFacturaService;
 import com.example.tomcat.service.GestionarHerramientaService;
@@ -37,6 +38,11 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class BeanConfig {
+
+    @Bean
+    public ControlAcceso controlAcceso(HerramientaRepositoryPort herramientaRepository) {
+        return new ControlAcceso(herramientaRepository);
+    }
 
     @Bean
     public RegistrarUsuarioUseCase registrarUsuarioUseCase(
@@ -66,9 +72,10 @@ public class BeanConfig {
     public GestionarHerramientaUseCase gestionarHerramientaUseCase(
             HerramientaRepositoryPort herramientaRepository,
             UsuarioRepositoryPort usuarioRepository,
-            CategoriaRepositoryPort categoriaRepository
+            CategoriaRepositoryPort categoriaRepository,
+            ControlAcceso controlAcceso
     ) {
-        return new GestionarHerramientaService(herramientaRepository, usuarioRepository, categoriaRepository);
+        return new GestionarHerramientaService(herramientaRepository, usuarioRepository, categoriaRepository, controlAcceso);
     }
 
     @Bean
@@ -84,9 +91,10 @@ public class BeanConfig {
     public GestionarReservaUseCase gestionarReservaUseCase(
             ReservaRepositoryPort reservaRepository,
             HerramientaRepositoryPort herramientaRepository,
-            MantenimientoRepositoryPort mantenimientoRepository
+            MantenimientoRepositoryPort mantenimientoRepository,
+            ControlAcceso controlAcceso
     ) {
-        return new GestionarReservaService(reservaRepository, herramientaRepository, mantenimientoRepository);
+        return new GestionarReservaService(reservaRepository, herramientaRepository, mantenimientoRepository, controlAcceso);
     }
 
     @Bean
@@ -109,8 +117,8 @@ public class BeanConfig {
     }
 
     @Bean
-    public GestionarFacturaUseCase gestionarFacturaUseCase(FacturaRepositoryPort facturaRepository) {
-        return new GestionarFacturaService(facturaRepository);
+    public GestionarFacturaUseCase gestionarFacturaUseCase(FacturaRepositoryPort facturaRepository, ControlAcceso controlAcceso) {
+        return new GestionarFacturaService(facturaRepository, controlAcceso);
     }
 
     @Bean
@@ -126,16 +134,19 @@ public class BeanConfig {
     @Bean
     public ListarPagosUseCase listarPagosUseCase(
             PagoRepositoryPort pagoRepository,
-            ReservaRepositoryPort reservaRepository
+            ReservaRepositoryPort reservaRepository,
+            ControlAcceso controlAcceso
     ) {
-        return new ListarPagosService(pagoRepository, reservaRepository);
+        return new ListarPagosService(pagoRepository, reservaRepository, controlAcceso);
     }
 
     @Bean
     public GestionarMantenimientoUseCase gestionarMantenimientoUseCase(
             MantenimientoRepositoryPort mantenimientoRepository,
-            HerramientaRepositoryPort herramientaRepository
+            HerramientaRepositoryPort herramientaRepository,
+            ReservaRepositoryPort reservaRepository,
+            ControlAcceso controlAcceso
     ) {
-        return new GestionarMantenimientoService(mantenimientoRepository, herramientaRepository);
+        return new GestionarMantenimientoService(mantenimientoRepository, herramientaRepository, reservaRepository, controlAcceso);
     }
 }

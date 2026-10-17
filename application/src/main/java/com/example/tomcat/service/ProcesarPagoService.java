@@ -1,5 +1,6 @@
 package com.example.tomcat.service;
 
+import com.example.tomcat.exception.AccesoDenegadoException;
 import com.example.tomcat.exception.DomainException;
 import com.example.tomcat.model.Factura;
 import com.example.tomcat.model.Herramienta;
@@ -7,6 +8,7 @@ import com.example.tomcat.model.Pago;
 import com.example.tomcat.model.Reserva;
 import com.example.tomcat.model.Usuario;
 import com.example.tomcat.port.in.ProcesarPagoUseCase;
+import com.example.tomcat.port.in.dto.Solicitante;
 import com.example.tomcat.repository.FacturaRepositoryPort;
 import com.example.tomcat.repository.HerramientaRepositoryPort;
 import com.example.tomcat.repository.PagoRepositoryPort;
@@ -43,9 +45,12 @@ public class ProcesarPagoService implements ProcesarPagoUseCase {
     }
 
     @Override
-    public Pago procesar(Long reservaId, BigDecimal monto, String metodoPago) {
+    public Pago procesar(Solicitante solicitante, Long reservaId, BigDecimal monto, String metodoPago) {
         Reserva reserva = reservaRepositoryPort.buscarPorId(reservaId)
                 .orElseThrow(() -> new DomainException("La reserva no existe."));
+        if (!solicitante.esAdmin() && !(solicitante.esCliente() && solicitante.esUsuario(reserva.getClienteId()))) {
+            throw new AccesoDenegadoException("Solo el cliente que hizo la reserva puede pagarla.");
+        }
 
         if (!reserva.permitePago()) {
             throw new DomainException("La reserva debe estar aceptada para registrar un pago.");

@@ -1,8 +1,10 @@
 package com.example.tomcat.service;
 
+import com.example.tomcat.exception.AccesoDenegadoException;
 import com.example.tomcat.exception.DomainException;
 import com.example.tomcat.model.Factura;
 import com.example.tomcat.port.in.GestionarFacturaUseCase;
+import com.example.tomcat.port.in.dto.Solicitante;
 import com.example.tomcat.repository.FacturaRepositoryPort;
 
 import java.util.List;
@@ -10,36 +12,50 @@ import java.util.List;
 public class GestionarFacturaService implements GestionarFacturaUseCase {
 
     private final FacturaRepositoryPort facturaRepositoryPort;
+    private final ControlAcceso controlAcceso;
 
-    public GestionarFacturaService(FacturaRepositoryPort facturaRepositoryPort) {
+    public GestionarFacturaService(FacturaRepositoryPort facturaRepositoryPort, ControlAcceso controlAcceso) {
         this.facturaRepositoryPort = facturaRepositoryPort;
+        this.controlAcceso = controlAcceso;
     }
 
     @Override
-    public Factura buscarPorId(Long id) {
-        return facturaRepositoryPort.buscarPorId(id)
-                .orElseThrow(() -> new DomainException("La factura no existe."));
+    public Factura buscarPorId(Solicitante solicitante, Long id) {
+        return verificar(solicitante, facturaRepositoryPort.buscarPorId(id)
+                .orElseThrow(() -> new DomainException("La factura no existe.")));
     }
 
     @Override
-    public Factura buscarPorPago(Long pagoId) {
-        return facturaRepositoryPort.buscarPorPagoId(pagoId)
-                .orElseThrow(() -> new DomainException("No hay factura asociada al pago."));
+    public Factura buscarPorPago(Solicitante solicitante, Long pagoId) {
+        return verificar(solicitante, facturaRepositoryPort.buscarPorPagoId(pagoId)
+                .orElseThrow(() -> new DomainException("No hay factura asociada al pago.")));
     }
 
     @Override
-    public Factura buscarPorReserva(Long reservaId) {
-        return facturaRepositoryPort.buscarPorReservaId(reservaId)
-                .orElseThrow(() -> new DomainException("No hay factura asociada a la reserva."));
+    public Factura buscarPorReserva(Solicitante solicitante, Long reservaId) {
+        return verificar(solicitante, facturaRepositoryPort.buscarPorReservaId(reservaId)
+                .orElseThrow(() -> new DomainException("No hay factura asociada a la reserva.")));
     }
 
     @Override
-    public List<Factura> listar() {
-        return facturaRepositoryPort.listar();
+    public List<Factura> listar(Solicitante solicitante, Long clienteId) {
+        if (solicitante.esCliente()) {
+            if (clienteId != null && !solicitante.esUsuario(clienteId)) {
+                throw new AccesoDenegadoException("Solo puede consultar sus propias facturas.");
+            }
+            return facturaRepositoryPort.listarPorCliente(solicitante.id());
+        }
+        if (solicitante.esProveedor()) {
+            List<Factura> facturas = facturaRepositoryPort.listarPorHerramientas(
+                    controlAcceso.idsHerramientasDelProveedor(solicitante.id()));
+            return clienteId == null ? facturas
+                    : facturas.stream().filter(f -> clienteId.equals(f.getClienteId())).toList();
+        }
+        return clienteId != null ? facturaRepositoryPort.listarPorCliente(clienteId) : facturaRepositoryPort.listar();
     }
 
-    @Override
-    public List<Factura> listarPorCliente(Long clienteId) {
-        return facturaRepositoryPort.listarPorCliente(clienteId);
+    private Factura verificar(Solicitante solicitante, Factura factura) {
+        controlAcceso.verificarAccesoFactura(solicitante, factura);
+        return factura;
     }
 }

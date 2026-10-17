@@ -2,9 +2,11 @@ package com.example.tomcat.adapter.in.rest;
 
 import com.example.tomcat.model.Factura;
 import com.example.tomcat.port.in.GestionarFacturaUseCase;
+import com.example.tomcat.security.UsuarioAutenticado;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
@@ -23,31 +25,30 @@ public class FacturaController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Factura>> listar(@RequestParam(required = false) Long clienteId) {
-        if (clienteId != null) {
-            return ResponseEntity.ok(gestionarFacturaUseCase.listarPorCliente(clienteId));
-        }
-        return ResponseEntity.ok(gestionarFacturaUseCase.listar());
+    public ResponseEntity<List<Factura>> listar(@AuthenticationPrincipal UsuarioAutenticado usuario,
+                                                @RequestParam(required = false) Long clienteId) {
+        return ResponseEntity.ok(gestionarFacturaUseCase.listar(usuario.solicitante(), clienteId));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Factura> obtener(@PathVariable Long id) {
-        return ResponseEntity.ok(gestionarFacturaUseCase.buscarPorId(id));
+    public ResponseEntity<Factura> obtener(@AuthenticationPrincipal UsuarioAutenticado usuario, @PathVariable Long id) {
+        return ResponseEntity.ok(gestionarFacturaUseCase.buscarPorId(usuario.solicitante(), id));
     }
 
     @GetMapping("/pago/{pagoId}")
-    public ResponseEntity<Factura> porPago(@PathVariable Long pagoId) {
-        return ResponseEntity.ok(gestionarFacturaUseCase.buscarPorPago(pagoId));
+    public ResponseEntity<Factura> porPago(@AuthenticationPrincipal UsuarioAutenticado usuario, @PathVariable Long pagoId) {
+        return ResponseEntity.ok(gestionarFacturaUseCase.buscarPorPago(usuario.solicitante(), pagoId));
     }
 
     @GetMapping("/reserva/{reservaId}")
-    public ResponseEntity<Factura> porReserva(@PathVariable Long reservaId) {
-        return ResponseEntity.ok(gestionarFacturaUseCase.buscarPorReserva(reservaId));
+    public ResponseEntity<Factura> porReserva(@AuthenticationPrincipal UsuarioAutenticado usuario,
+                                              @PathVariable Long reservaId) {
+        return ResponseEntity.ok(gestionarFacturaUseCase.buscarPorReserva(usuario.solicitante(), reservaId));
     }
 
     @GetMapping(value = "/{id}/descargar", produces = MediaType.TEXT_HTML_VALUE)
-    public ResponseEntity<byte[]> descargar(@PathVariable Long id) {
-        Factura factura = gestionarFacturaUseCase.buscarPorId(id);
+    public ResponseEntity<byte[]> descargar(@AuthenticationPrincipal UsuarioAutenticado usuario, @PathVariable Long id) {
+        Factura factura = gestionarFacturaUseCase.buscarPorId(usuario.solicitante(), id);
         byte[] contenido = facturaHtmlRenderer.render(factura).getBytes(StandardCharsets.UTF_8);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + factura.getNumero() + ".html")
