@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 
 public class ConsultarPanelService implements ConsultarPanelUseCase {
 
-    private static final Set<String> ESTADOS_EN_CURSO = Set.of("PENDIENTE", "ACEPTADA", "ENTREGADA");
+    private static final Set<String> ESTADOS_EN_CURSO = Set.of("PENDIENTE", "ACEPTADA", "CONFIRMADA", "ENTREGADA");
 
     private final UsuarioRepositoryPort usuarioRepositoryPort;
     private final HerramientaRepositoryPort herramientaRepositoryPort;

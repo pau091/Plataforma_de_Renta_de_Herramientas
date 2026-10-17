@@ -35,6 +35,10 @@ app:
   uploads:
     # Carpeta donde se guardan las imágenes subidas (se publican en /uploads/**).
     dir: ${APP_UPLOADS_DIR:uploads}
+  reservas:
+    # Plazo máximo para que el proveedor acepte una reserva PENDIENTE, o para que el cliente
+    # pague una reserva ACEPTADA, antes de que venza (formato ISO-8601: PT1H = 1 hora).
+    plazo-maximo: ${APP_RESERVAS_PLAZO_MAXIMO:PT1H}
   vencimiento:
-    # Todos los días a las 00:05 (segundo minuto hora día mes día-semana).
-    cron: ${APP_VENCIMIENTO_CRON:0 5 0 * * *}
+    # Revisión de reservas vencidas: cada minuto (segundo minuto hora día mes día-semana).
+    cron: ${APP_VENCIMIENTO_CRON:0 * * * * *}

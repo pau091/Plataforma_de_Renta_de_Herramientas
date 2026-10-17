@@ -14,7 +14,6 @@ public interface ReservaRepositoryPort {
     List<Reserva> listarPorCliente(Long clienteId);
     List<Reserva> listarPorProveedor(Long proveedorId);
     List<Reserva> listarPorHerramienta(Long herramientaId);
-    /** Reservas en alguno de los estados indicados cuya fecha de inicio es anterior a {@code fecha}. */
-    List<Reserva> listarPorEstadosConInicioAntesDe(Collection<String> estados, LocalDate fecha);
+    List<Reserva> listarPorEstados(Collection<String> estados);
     boolean existeSolape(Long herramientaId, LocalDate fechaInicio, LocalDate fechaFin, Long reservaIdExcluida);
 }

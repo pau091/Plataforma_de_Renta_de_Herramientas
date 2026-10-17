@@ -31,19 +31,22 @@ public class ProcesarPagoService implements ProcesarPagoUseCase {
     private final HerramientaRepositoryPort herramientaRepositoryPort;
     private final UsuarioRepositoryPort usuarioRepositoryPort;
     private final FacturaRepositoryPort facturaRepositoryPort;
+    private final PoliticaVencimiento politica;
 
     public ProcesarPagoService(
             PagoRepositoryPort pagoRepositoryPort,
             ReservaRepositoryPort reservaRepositoryPort,
             HerramientaRepositoryPort herramientaRepositoryPort,
             UsuarioRepositoryPort usuarioRepositoryPort,
-            FacturaRepositoryPort facturaRepositoryPort
+            FacturaRepositoryPort facturaRepositoryPort,
+            PoliticaVencimiento politica
     ) {
         this.pagoRepositoryPort = pagoRepositoryPort;
         this.reservaRepositoryPort = reservaRepositoryPort;
         this.herramientaRepositoryPort = herramientaRepositoryPort;
         this.usuarioRepositoryPort = usuarioRepositoryPort;
         this.facturaRepositoryPort = facturaRepositoryPort;
+        this.politica = politica;
     }
 
     @Override
@@ -54,12 +57,15 @@ public class ProcesarPagoService implements ProcesarPagoUseCase {
             throw new AccesoDenegadoException("Solo el cliente que hizo la reserva puede pagarla.");
         }
 
-        if (!reserva.permitePago()) {
-            throw new DomainException("La reserva debe estar aceptada para registrar un pago.");
-        }
         if (pagoRepositoryPort.existePagoCompletado(reservaId)) {
             throw new ConflictoException("La reserva ya tiene un pago completado.");
         }
+        if (politica.estaVencida(reserva)) {
+            throw new ConflictoException("La reserva venció: el plazo para pagarla era de "
+                    + politica.getPlazoMaximo().toMinutes() + " minutos desde que el proveedor la aceptó.");
+        }
+        // Confirmación automática: al pagar, la reserva ACEPTADA pasa a CONFIRMADA (si no está aceptada, falla aquí).
+        reserva.confirmarPago();
 
         Herramienta herramienta = herramientaRepositoryPort.buscarPorId(reserva.getHerramientaId())
                 .orElseThrow(() -> new RecursoNoEncontradoException("La herramienta no existe."));
@@ -78,6 +84,7 @@ public class ProcesarPagoService implements ProcesarPagoUseCase {
         }
 
         Pago pago = pagoRepositoryPort.guardar(new Pago(null, reservaId, dinero.getMonto(), metodo, "COMPLETADO", null));
+        reservaRepositoryPort.guardar(reserva);
         facturaRepositoryPort.guardar(new Factura(
                 null,
                 "FAC-" + String.format("%06d", pago.getId()),

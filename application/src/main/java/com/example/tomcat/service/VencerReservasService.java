@@ -5,8 +5,6 @@ import com.example.tomcat.port.in.VencerReservasUseCase;
 import com.example.tomcat.repository.PagoRepositoryPort;
 import com.example.tomcat.repository.ReservaRepositoryPort;
 
-import java.time.Clock;
-import java.time.LocalDate;
 import java.util.List;
 
 public class VencerReservasService implements VencerReservasUseCase {
@@ -15,19 +13,20 @@ public class VencerReservasService implements VencerReservasUseCase {
 
     private final ReservaRepositoryPort reservaRepositoryPort;
     private final PagoRepositoryPort pagoRepositoryPort;
-    private final Clock reloj;
+    private final PoliticaVencimiento politica;
 
-    public VencerReservasService(ReservaRepositoryPort reservaRepositoryPort, PagoRepositoryPort pagoRepositoryPort, Clock reloj) {
+    public VencerReservasService(ReservaRepositoryPort reservaRepositoryPort, PagoRepositoryPort pagoRepositoryPort,
+                                 PoliticaVencimiento politica) {
         this.reservaRepositoryPort = reservaRepositoryPort;
         this.pagoRepositoryPort = pagoRepositoryPort;
-        this.reloj = reloj;
+        this.politica = politica;
     }
 
     @Override
     public List<Reserva> vencerReservas() {
-        LocalDate hoy = LocalDate.now(reloj);
-        return reservaRepositoryPort.listarPorEstadosConInicioAntesDe(ESTADOS_VENCIBLES, hoy).stream()
-                // Una reserva ACEPTADA y ya pagada no vence: el proveedor aún debe entregarla.
+        return reservaRepositoryPort.listarPorEstados(ESTADOS_VENCIBLES).stream()
+                .filter(politica::estaVencida)
+                // Protección para datos antiguos: una reserva con pago completado nunca vence.
                 .filter(reserva -> !pagoRepositoryPort.existePagoCompletado(reserva.getId()))
                 .map(reserva -> {
                     reserva.vencer();

@@ -7,6 +7,12 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Set;
 
+/**
+ * Ciclo de vida de una reserva:
+ * PENDIENTE --(proveedor acepta)--> ACEPTADA --(cliente paga: confirmación automática)--> CONFIRMADA
+ * --(proveedor entrega)--> ENTREGADA --(devolución)--> FINALIZADA.
+ * PENDIENTE puede pasar a RECHAZADA; PENDIENTE y ACEPTADA pueden pasar a VENCIDA si se agota el plazo.
+ */
 public class Reserva {
     private static final Set<String> ESTADOS_DEVOLUCION = Set.of("BUENO", "DANADO", "PERDIDO");
 
@@ -20,10 +26,12 @@ public class Reserva {
     private LocalDateTime fechaDevolucion;
     private String estadoDevolucion;
     private String observacionesDevolucion;
+    private LocalDateTime fechaCreacion;
+    private LocalDateTime fechaAceptacion;
 
     public Reserva(Long id, Long clienteId, Long herramientaId, LocalDate fechaInicio, LocalDate fechaFin, String estado,
                    LocalDateTime fechaEntrega, LocalDateTime fechaDevolucion, String estadoDevolucion,
-                   String observacionesDevolucion) {
+                   String observacionesDevolucion, LocalDateTime fechaCreacion, LocalDateTime fechaAceptacion) {
         this.id = id;
         this.clienteId = clienteId;
         this.herramientaId = herramientaId;
@@ -34,6 +42,8 @@ public class Reserva {
         this.fechaDevolucion = fechaDevolucion;
         this.estadoDevolucion = estadoDevolucion;
         this.observacionesDevolucion = observacionesDevolucion;
+        this.fechaCreacion = fechaCreacion;
+        this.fechaAceptacion = fechaAceptacion;
     }
 
     public Long getId() { return id; }
@@ -46,14 +56,23 @@ public class Reserva {
     public LocalDateTime getFechaDevolucion() { return fechaDevolucion; }
     public String getEstadoDevolucion() { return estadoDevolucion; }
     public String getObservacionesDevolucion() { return observacionesDevolucion; }
+    public LocalDateTime getFechaCreacion() { return fechaCreacion; }
+    public LocalDateTime getFechaAceptacion() { return fechaAceptacion; }
 
     public long diasAlquiler() {
         return ChronoUnit.DAYS.between(fechaInicio, fechaFin) + 1;
     }
 
-    public void aceptar() {
+    public void aceptar(LocalDateTime ahora) {
         exigirEstado("PENDIENTE", "Solo se pueden aceptar reservas pendientes.");
         this.estado = "ACEPTADA";
+        this.fechaAceptacion = ahora;
+    }
+
+    /** Confirmación automática: ocurre en el momento en que el cliente paga una reserva aceptada. */
+    public void confirmarPago() {
+        exigirEstado("ACEPTADA", "La reserva debe estar aceptada por el proveedor para poder pagarla.");
+        this.estado = "CONFIRMADA";
     }
 
     public void rechazar() {
@@ -62,7 +81,7 @@ public class Reserva {
     }
 
     public void entregar() {
-        exigirEstado("ACEPTADA", "Solo se pueden entregar reservas aceptadas.");
+        exigirEstado("CONFIRMADA", "Solo se pueden entregar reservas confirmadas (aceptadas y pagadas).");
         this.estado = "ENTREGADA";
         this.fechaEntrega = LocalDateTime.now();
     }
@@ -80,18 +99,30 @@ public class Reserva {
     }
 
     /**
-     * Una reserva vence cuando llega su fecha de inicio sin haberse concretado: el proveedor nunca
-     * la respondió (PENDIENTE) o fue aceptada pero no se pagó. Al vencer libera esas fechas.
+     * Indica si la reserva debe vencer porque no se concretó a tiempo:
+     * - PENDIENTE: el proveedor no la aceptó dentro del plazo desde su creación.
+     * - ACEPTADA: el cliente no la pagó dentro del plazo desde su aceptación.
+     * - En ambos casos, también vence si su fecha de inicio ya pasó.
+     *
+     * @param hoy             fecha actual del negocio
+     * @param limiteRespuesta instante (UTC) antes del cual se considera agotado el plazo: ahora - plazo máximo
      */
-    public void vencer() {
+    public boolean debeVencer(LocalDate hoy, LocalDateTime limiteRespuesta) {
         if (!"PENDIENTE".equals(estado) && !"ACEPTADA".equals(estado)) {
-            throw new DomainException("Solo pueden vencer reservas pendientes o aceptadas sin entregar.");
+            return false;
         }
-        this.estado = "VENCIDA";
+        if (fechaInicio.isBefore(hoy)) {
+            return true;
+        }
+        LocalDateTime referencia = "ACEPTADA".equals(estado) && fechaAceptacion != null ? fechaAceptacion : fechaCreacion;
+        return referencia != null && !referencia.isAfter(limiteRespuesta);
     }
 
-    public boolean permitePago() {
-        return "ACEPTADA".equals(estado) || "ENTREGADA".equals(estado) || "FINALIZADA".equals(estado);
+    public void vencer() {
+        if (!"PENDIENTE".equals(estado) && !"ACEPTADA".equals(estado)) {
+            throw new DomainException("Solo pueden vencer reservas pendientes o aceptadas sin pagar.");
+        }
+        this.estado = "VENCIDA";
     }
 
     public boolean tieneDano() {

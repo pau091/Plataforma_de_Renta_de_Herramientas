@@ -12,7 +12,7 @@ import java.util.List;
 public interface SpringDataReservaRepository extends JpaRepository<ReservaEntity, Long> {
     List<ReservaEntity> findByClienteId(Long clienteId);
     List<ReservaEntity> findByHerramientaId(Long herramientaId);
-    List<ReservaEntity> findByEstadoInAndFechaInicioBefore(Collection<String> estados, LocalDate fecha);
+    List<ReservaEntity> findByEstadoIn(Collection<String> estados);
 
     @Query("SELECT r FROM ReservaEntity r WHERE r.herramientaId IN :herramientaIds")
     List<ReservaEntity> findByHerramientaIdIn(@Param("herramientaIds") List<Long> herramientaIds);
@@ -20,7 +20,7 @@ public interface SpringDataReservaRepository extends JpaRepository<ReservaEntity
     @Query("""
             SELECT COUNT(r) > 0 FROM ReservaEntity r
             WHERE r.herramientaId = :herramientaId
-              AND r.estado IN ('PENDIENTE', 'ACEPTADA', 'ENTREGADA')
+              AND r.estado IN ('PENDIENTE', 'ACEPTADA', 'CONFIRMADA', 'ENTREGADA')
               AND r.fechaInicio <= :fechaFin
               AND r.fechaFin >= :fechaInicio
               AND (:reservaIdExcluida IS NULL OR r.id <> :reservaIdExcluida)

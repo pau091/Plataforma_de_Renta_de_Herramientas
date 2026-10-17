@@ -14,7 +14,6 @@ import com.example.tomcat.repository.HerramientaRepositoryPort;
 import com.example.tomcat.repository.ReservaRepositoryPort;
 import com.example.tomcat.repository.UsuarioRepositoryPort;
 
-import java.time.Clock;
 import java.time.LocalDate;
 
 public class CrearReservaService implements CrearReservaUseCase {
@@ -22,18 +21,18 @@ public class CrearReservaService implements CrearReservaUseCase {
     private final HerramientaRepositoryPort herramientaRepositoryPort;
     private final UsuarioRepositoryPort usuarioRepositoryPort;
     private final ReservaRepositoryPort reservaRepositoryPort;
-    private final Clock reloj;
+    private final PoliticaVencimiento politica;
 
     public CrearReservaService(
             HerramientaRepositoryPort herramientaRepositoryPort,
             UsuarioRepositoryPort usuarioRepositoryPort,
             ReservaRepositoryPort reservaRepositoryPort,
-            Clock reloj
+            PoliticaVencimiento politica
     ) {
         this.herramientaRepositoryPort = herramientaRepositoryPort;
         this.usuarioRepositoryPort = usuarioRepositoryPort;
         this.reservaRepositoryPort = reservaRepositoryPort;
-        this.reloj = reloj;
+        this.politica = politica;
     }
 
     @Override
@@ -53,14 +52,16 @@ public class CrearReservaService implements CrearReservaUseCase {
         if (fechaInicio.isAfter(fechaFin)) {
             throw new DomainException("La fecha de inicio no puede ser posterior a la fecha fin.");
         }
-        if (fechaInicio.isBefore(LocalDate.now(reloj))) {
+        if (fechaInicio.isBefore(politica.hoy())) {
             throw new DomainException("No se puede reservar con una fecha de inicio pasada.");
         }
         if (reservaRepositoryPort.existeSolape(herramientaId, fechaInicio, fechaFin, null)) {
             throw new ConflictoException("La herramienta ya tiene una reserva en esas fechas.");
         }
 
-        Reserva reserva = new Reserva(null, clienteReserva, herramientaId, fechaInicio, fechaFin, "PENDIENTE", null, null, null, null);
+        // Queda PENDIENTE: el proveedor tiene el plazo máximo (1 hora por defecto) para aceptarla o rechazarla.
+        Reserva reserva = new Reserva(null, clienteReserva, herramientaId, fechaInicio, fechaFin, "PENDIENTE",
+                null, null, null, null, politica.ahoraUtc(), null);
         return reservaRepositoryPort.guardar(reserva);
     }
 

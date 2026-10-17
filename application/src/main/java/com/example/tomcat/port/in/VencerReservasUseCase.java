@@ -6,8 +6,8 @@ import java.util.List;
 
 public interface VencerReservasUseCase {
     /**
-     * Marca como VENCIDA cada reserva cuya fecha de inicio ya pasó y que sigue PENDIENTE
-     * o ACEPTADA sin pago completado. Devuelve las reservas vencidas en esta ejecución.
+     * Marca como VENCIDA cada reserva que no se concretó a tiempo: PENDIENTE sin aceptar o ACEPTADA
+     * sin pagar dentro del plazo máximo, o cuya fecha de inicio ya pasó. Devuelve las reservas vencidas.
      */
     List<Reserva> vencerReservas();
 }

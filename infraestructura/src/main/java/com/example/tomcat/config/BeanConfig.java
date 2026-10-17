@@ -37,6 +37,7 @@ import com.example.tomcat.service.GestionarMantenimientoService;
 import com.example.tomcat.service.GestionarReservaService;
 import com.example.tomcat.service.GestionarUsuarioService;
 import com.example.tomcat.service.ListarPagosService;
+import com.example.tomcat.service.PoliticaVencimiento;
 import com.example.tomcat.service.ProcesarPagoService;
 import com.example.tomcat.service.RegistrarUsuarioService;
 import com.example.tomcat.service.VencerReservasService;
@@ -46,6 +47,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.ZoneId;
 
 /**
@@ -68,6 +70,12 @@ public class BeanConfig {
     @Bean
     public Clock reloj(@Value("${app.zona-horaria}") String zonaHoraria) {
         return Clock.system(ZoneId.of(zonaHoraria));
+    }
+
+    /** Plazo máximo para que una reserva PENDIENTE se acepte o una ACEPTADA se pague antes de vencer. */
+    @Bean
+    public PoliticaVencimiento politicaVencimiento(Clock reloj, @Value("${app.reservas.plazo-maximo}") Duration plazoMaximo) {
+        return new PoliticaVencimiento(reloj, plazoMaximo);
     }
 
     @Bean
@@ -126,20 +134,21 @@ public class BeanConfig {
             HerramientaRepositoryPort herramientaRepository,
             UsuarioRepositoryPort usuarioRepository,
             ReservaRepositoryPort reservaRepository,
-            Clock reloj
+            PoliticaVencimiento politicaVencimiento
     ) {
         return TransaccionalProxy.envolver(CrearReservaUseCase.class,
-                new CrearReservaService(herramientaRepository, usuarioRepository, reservaRepository, reloj), tx, ESCRITURA);
+                new CrearReservaService(herramientaRepository, usuarioRepository, reservaRepository, politicaVencimiento),
+                tx, ESCRITURA);
     }
 
     @Bean
     public VencerReservasUseCase vencerReservasUseCase(
             ReservaRepositoryPort reservaRepository,
             PagoRepositoryPort pagoRepository,
-            Clock reloj
+            PoliticaVencimiento politicaVencimiento
     ) {
         return TransaccionalProxy.envolver(VencerReservasUseCase.class,
-                new VencerReservasService(reservaRepository, pagoRepository, reloj), tx, ESCRITURA);
+                new VencerReservasService(reservaRepository, pagoRepository, politicaVencimiento), tx, ESCRITURA);
     }
 
     @Bean
@@ -171,10 +180,12 @@ public class BeanConfig {
             ReservaRepositoryPort reservaRepository,
             HerramientaRepositoryPort herramientaRepository,
             MantenimientoRepositoryPort mantenimientoRepository,
-            ControlAcceso controlAcceso
+            ControlAcceso controlAcceso,
+            PoliticaVencimiento politicaVencimiento
     ) {
         return TransaccionalProxy.envolver(GestionarReservaUseCase.class,
-                new GestionarReservaService(reservaRepository, herramientaRepository, mantenimientoRepository, controlAcceso),
+                new GestionarReservaService(reservaRepository, herramientaRepository, mantenimientoRepository, controlAcceso,
+                        politicaVencimiento),
                 tx, ESCRITURA);
     }
 
@@ -193,10 +204,12 @@ public class BeanConfig {
             ReservaRepositoryPort reservaRepository,
             HerramientaRepositoryPort herramientaRepository,
             UsuarioRepositoryPort usuarioRepository,
-            FacturaRepositoryPort facturaRepository
+            FacturaRepositoryPort facturaRepository,
+            PoliticaVencimiento politicaVencimiento
     ) {
         return TransaccionalProxy.envolver(ProcesarPagoUseCase.class,
-                new ProcesarPagoService(pagoRepository, reservaRepository, herramientaRepository, usuarioRepository, facturaRepository),
+                new ProcesarPagoService(pagoRepository, reservaRepository, herramientaRepository, usuarioRepository,
+                        facturaRepository, politicaVencimiento),
                 tx, ESCRITURA);
     }
 

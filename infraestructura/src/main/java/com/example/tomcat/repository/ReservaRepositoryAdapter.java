@@ -70,8 +70,8 @@ public class ReservaRepositoryAdapter implements ReservaRepositoryPort {
     }
 
     @Override
-    public List<Reserva> listarPorEstadosConInicioAntesDe(Collection<String> estados, LocalDate fecha) {
-        return reservaRepository.findByEstadoInAndFechaInicioBefore(estados, fecha).stream().map(mapper::toDomain).toList();
+    public List<Reserva> listarPorEstados(Collection<String> estados) {
+        return reservaRepository.findByEstadoIn(estados).stream().map(mapper::toDomain).toList();
     }
 
     @Override

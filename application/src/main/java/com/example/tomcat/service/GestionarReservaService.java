@@ -21,17 +21,20 @@ public class GestionarReservaService implements GestionarReservaUseCase {
     private final HerramientaRepositoryPort herramientaRepositoryPort;
     private final MantenimientoRepositoryPort mantenimientoRepositoryPort;
     private final ControlAcceso controlAcceso;
+    private final PoliticaVencimiento politica;
 
     public GestionarReservaService(
             ReservaRepositoryPort reservaRepositoryPort,
             HerramientaRepositoryPort herramientaRepositoryPort,
             MantenimientoRepositoryPort mantenimientoRepositoryPort,
-            ControlAcceso controlAcceso
+            ControlAcceso controlAcceso,
+            PoliticaVencimiento politica
     ) {
         this.reservaRepositoryPort = reservaRepositoryPort;
         this.herramientaRepositoryPort = herramientaRepositoryPort;
         this.mantenimientoRepositoryPort = mantenimientoRepositoryPort;
         this.controlAcceso = controlAcceso;
+        this.politica = politica;
     }
 
     @Override
@@ -84,7 +87,11 @@ public class GestionarReservaService implements GestionarReservaUseCase {
         if (reservaRepositoryPort.existeSolape(reserva.getHerramientaId(), reserva.getFechaInicio(), reserva.getFechaFin(), reserva.getId())) {
             throw new ConflictoException("La herramienta ya tiene una reserva en esas fechas.");
         }
-        reserva.aceptar();
+        if (politica.estaVencida(reserva)) {
+            throw new ConflictoException("La reserva venció: el plazo para aceptarla era de "
+                    + politica.getPlazoMaximo().toMinutes() + " minutos desde que se creó.");
+        }
+        reserva.aceptar(politica.ahoraUtc());
         return reservaRepositoryPort.guardar(reserva);
     }
 

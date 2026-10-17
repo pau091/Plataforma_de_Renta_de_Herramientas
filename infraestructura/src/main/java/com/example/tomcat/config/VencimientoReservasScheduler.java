@@ -13,8 +13,9 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * Vence automáticamente las reservas cuya fecha de inicio ya pasó sin concretarse.
- * Se ejecuta al arrancar la aplicación y luego cada día (por defecto a las 00:05, hora de app.zona-horaria).
+ * Vence automáticamente las reservas que no se concretaron a tiempo: PENDIENTE sin aceptar o ACEPTADA
+ * sin pagar dentro de app.reservas.plazo-maximo (1 hora), o cuya fecha de inicio ya pasó.
+ * Se ejecuta al arrancar la aplicación y luego según app.vencimiento.cron (por defecto, cada minuto).
  */
 @Component
 @EnableScheduling

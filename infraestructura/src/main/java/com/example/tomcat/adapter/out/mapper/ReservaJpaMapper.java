@@ -18,7 +18,9 @@ public class ReservaJpaMapper {
                 entity.getFechaEntrega(),
                 entity.getFechaDevolucion(),
                 entity.getEstadoDevolucion(),
-                entity.getObservacionesDevolucion()
+                entity.getObservacionesDevolucion(),
+                entity.getFechaCreacion(),
+                entity.getFechaAceptacion()
         );
     }
 
@@ -32,5 +34,9 @@ public class ReservaJpaMapper {
         entity.setFechaDevolucion(reserva.getFechaDevolucion());
         entity.setEstadoDevolucion(reserva.getEstadoDevolucion());
         entity.setObservacionesDevolucion(reserva.getObservacionesDevolucion());
+        if (reserva.getFechaCreacion() != null) {
+            entity.setFechaCreacion(reserva.getFechaCreacion());
+        }
+        entity.setFechaAceptacion(reserva.getFechaAceptacion());
     }
 }

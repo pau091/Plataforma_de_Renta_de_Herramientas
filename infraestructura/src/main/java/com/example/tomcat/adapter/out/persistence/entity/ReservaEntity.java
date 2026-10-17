@@ -39,6 +39,14 @@ public class ReservaEntity {
     @Column(name = "observaciones_devolucion")
     private String observacionesDevolucion;
 
+    /** Instante de creación en UTC: desde aquí corre el plazo del proveedor para aceptarla. */
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime fechaCreacion;
+
+    /** Instante de aceptación en UTC: desde aquí corre el plazo del cliente para pagarla. */
+    @Column(name = "fecha_aceptacion")
+    private LocalDateTime fechaAceptacion;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getClienteId() { return clienteId; }
@@ -59,4 +67,8 @@ public class ReservaEntity {
     public void setEstadoDevolucion(String estadoDevolucion) { this.estadoDevolucion = estadoDevolucion; }
     public String getObservacionesDevolucion() { return observacionesDevolucion; }
     public void setObservacionesDevolucion(String observacionesDevolucion) { this.observacionesDevolucion = observacionesDevolucion; }
+    public LocalDateTime getFechaCreacion() { return fechaCreacion; }
+    public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
+    public LocalDateTime getFechaAceptacion() { return fechaAceptacion; }
+    public void setFechaAceptacion(LocalDateTime fechaAceptacion) { this.fechaAceptacion = fechaAceptacion; }
 }
