@@ -38,10 +38,6 @@ public class Usuario {
         this.password = passwordHash;
     }
 
-    public void cambiarRol(Rol rol) {
-        this.rol = rol;
-    }
-
     public void activar() {
         this.activo = true;
     }

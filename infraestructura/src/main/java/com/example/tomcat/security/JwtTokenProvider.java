@@ -39,15 +39,6 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    public String obtenerEmailDelToken(String token) {
-        return parseClaims(token).getSubject();
-    }
-
-    public Rol obtenerRolDelToken(String token) {
-        Object rol = parseClaims(token).get("rol");
-        return Rol.desde(rol != null ? rol.toString() : null);
-    }
-
     public Long obtenerUsuarioIdDelToken(String token) {
         Object usuarioId = parseClaims(token).get("usuarioId");
         if (usuarioId instanceof Number number) {

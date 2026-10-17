@@ -1,6 +1,5 @@
 package com.example.tomcat.port.in;
 
-import com.example.tomcat.model.Rol;
 import com.example.tomcat.model.Usuario;
 
 import java.util.List;

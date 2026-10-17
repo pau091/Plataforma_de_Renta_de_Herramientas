@@ -14,22 +14,10 @@
     <packaging>jar</packaging>
 
     <dependencies>
-        <!-- Obligatoria: los servicios usan modelos y puertos del dominio -->
+        <!-- Los casos de uso solo dependen del dominio; Spring se configura en infraestructura (BeanConfig). -->
         <dependency>
             <groupId>com.example</groupId>
             <artifactId>domain</artifactId>
-        </dependency>
-
-        <!-- Solo si tus servicios usan @Service -->
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-context</artifactId>
-        </dependency>
-
-        <!-- Solo si tus servicios usan @Transactional -->
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-tx</artifactId>
         </dependency>
     </dependencies>
 </project>

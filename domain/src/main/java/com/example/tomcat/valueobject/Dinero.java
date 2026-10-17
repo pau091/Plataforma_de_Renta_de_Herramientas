@@ -20,14 +20,6 @@ public class Dinero {
         return monto;
     }
 
-    public Dinero sumar(Dinero otro) {
-        return new Dinero(this.monto.add(otro.monto));
-    }
-
-    public Dinero multiplicar(int cantidad) {
-        return new Dinero(this.monto.multiply(BigDecimal.valueOf(cantidad)));
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

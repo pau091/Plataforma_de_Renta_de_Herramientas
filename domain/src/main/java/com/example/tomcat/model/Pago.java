@@ -26,7 +26,4 @@ public class Pago {
     public String getMetodoPago() { return metodoPago; }
     public String getEstadoPago() { return estadoPago; }
     public LocalDateTime getFechaPago() { return fechaPago; }
-
-    public void completar() { this.estadoPago = "COMPLETADO"; }
-    public void rechazar() { this.estadoPago = "RECHAZADO"; }
 }
