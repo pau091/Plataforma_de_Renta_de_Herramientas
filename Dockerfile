@@ -1,7 +1,7 @@
 # ==========================================
 # ETAPA 1: Construcción del Proyecto con Maven
 # ==========================================
-FROM maven:3.9.6-eclipse-temurin-17 AS builder
+FROM maven:3.9.6-eclipse-temurin-21 AS builder
 WORKDIR /app
 
 # Copiamos todo el código fuente del proyecto multimódulo
@@ -13,7 +13,7 @@ RUN mvn clean package -DskipTests
 # ==========================================
 # ETAPA 2: Despliegue en Apache Tomcat
 # ==========================================
-FROM tomcat:10.1-jdk17
+FROM tomcat:10.1-jdk21
 WORKDIR /usr/local/tomcat
 
 # Eliminamos las aplicaciones por defecto de Tomcat

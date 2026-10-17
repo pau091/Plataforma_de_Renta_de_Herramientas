@@ -8,7 +8,9 @@ services:
       MYSQL_PASSWORD: mysql
       MYSQL_ROOT_PASSWORD: mysql
     ports:
-      - "3306:3306"
+      # 3307 en el equipo para no chocar con un MySQL instalado en Windows (puerto 3306).
+      # Dentro de Docker la app sigue usando mysql:3306.
+      - "3307:3306"
     volumes:
       - mysqldata:/var/lib/mysql
     healthcheck:

@@ -1,0 +1,7 @@
+# La imagen se compila desde el código fuente; no se copian builds locales ni secretos.
+**/target/
+.git/
+.idea/
+.vscode/
+.env
+*.iml
