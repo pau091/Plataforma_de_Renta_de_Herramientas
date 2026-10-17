@@ -1,7 +1,9 @@
 package com.example.tomcat.service;
 
 import com.example.tomcat.exception.AccesoDenegadoException;
+import com.example.tomcat.exception.ConflictoException;
 import com.example.tomcat.exception.DomainException;
+import com.example.tomcat.exception.RecursoNoEncontradoException;
 import com.example.tomcat.model.Herramienta;
 import com.example.tomcat.model.Rol;
 import com.example.tomcat.model.Usuario;
@@ -9,6 +11,8 @@ import com.example.tomcat.port.in.GestionarHerramientaUseCase;
 import com.example.tomcat.port.in.dto.Solicitante;
 import com.example.tomcat.repository.CategoriaRepositoryPort;
 import com.example.tomcat.repository.HerramientaRepositoryPort;
+import com.example.tomcat.repository.MantenimientoRepositoryPort;
+import com.example.tomcat.repository.ReservaRepositoryPort;
 import com.example.tomcat.repository.UsuarioRepositoryPort;
 import com.example.tomcat.valueobject.Dinero;
 
@@ -20,17 +24,23 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
     private final HerramientaRepositoryPort herramientaRepositoryPort;
     private final UsuarioRepositoryPort usuarioRepositoryPort;
     private final CategoriaRepositoryPort categoriaRepositoryPort;
+    private final ReservaRepositoryPort reservaRepositoryPort;
+    private final MantenimientoRepositoryPort mantenimientoRepositoryPort;
     private final ControlAcceso controlAcceso;
 
     public GestionarHerramientaService(
             HerramientaRepositoryPort herramientaRepositoryPort,
             UsuarioRepositoryPort usuarioRepositoryPort,
             CategoriaRepositoryPort categoriaRepositoryPort,
+            ReservaRepositoryPort reservaRepositoryPort,
+            MantenimientoRepositoryPort mantenimientoRepositoryPort,
             ControlAcceso controlAcceso
     ) {
         this.herramientaRepositoryPort = herramientaRepositoryPort;
         this.usuarioRepositoryPort = usuarioRepositoryPort;
         this.categoriaRepositoryPort = categoriaRepositoryPort;
+        this.reservaRepositoryPort = reservaRepositoryPort;
+        this.mantenimientoRepositoryPort = mantenimientoRepositoryPort;
         this.controlAcceso = controlAcceso;
     }
 
@@ -40,7 +50,6 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
         Long dueno = resolverProveedor(solicitante, proveedorId);
         validarCategoria(categoriaId);
         validarNombre(nombre);
-        Dinero tarifa = new Dinero(tarifaDiaria);
 
         Herramienta herramienta = new Herramienta(
                 null,
@@ -48,7 +57,7 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
                 categoriaId,
                 nombre.trim(),
                 descripcion,
-                tarifa.getMonto(),
+                validarTarifa(tarifaDiaria),
                 "DISPONIBLE",
                 imagenUrl
         );
@@ -62,15 +71,24 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
         Long categoria = categoriaId != null ? categoriaId : herramienta.getCategoriaId();
         validarCategoria(categoria);
         String nombreActualizado = (nombre == null || nombre.isBlank()) ? herramienta.getNombre() : nombre.trim();
-        BigDecimal tarifa = tarifaDiaria != null ? new Dinero(tarifaDiaria).getMonto() : herramienta.getTarifaDiaria();
+        BigDecimal tarifa = tarifaDiaria != null ? validarTarifa(tarifaDiaria) : herramienta.getTarifaDiaria();
 
         herramienta.actualizar(categoria, nombreActualizado, descripcion, tarifa, estado, imagenUrl);
         return herramientaRepositoryPort.guardar(herramienta);
     }
 
+    /**
+     * Solo se eliminan herramientas sin historial. Si ya tiene reservas o mantenimientos se debe
+     * marcar como FUERA_DE_SERVICIO, para no perder reservas, pagos ni facturas asociadas.
+     */
     @Override
     public void eliminar(Solicitante solicitante, Long id) {
         buscarPropia(solicitante, id);
+        if (!reservaRepositoryPort.listarPorHerramienta(id).isEmpty()
+                || !mantenimientoRepositoryPort.listarPorHerramienta(id).isEmpty()) {
+            throw new ConflictoException("La herramienta tiene reservas o mantenimientos registrados y no se puede eliminar. "
+                    + "Cambie su estado a FUERA_DE_SERVICIO.");
+        }
         herramientaRepositoryPort.eliminar(id);
     }
 
@@ -109,7 +127,7 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
     @Override
     public Herramienta buscarPorId(Long id) {
         return herramientaRepositoryPort.buscarPorId(id)
-                .orElseThrow(() -> new DomainException("La herramienta no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("La herramienta no existe."));
     }
 
     private Herramienta buscarPropia(Solicitante solicitante, Long id) {
@@ -130,7 +148,7 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
             throw new DomainException("Debe indicar el proveedorId del dueño de la herramienta.");
         }
         Usuario proveedor = usuarioRepositoryPort.buscarPorId(proveedorId)
-                .orElseThrow(() -> new DomainException("El proveedor no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("El proveedor no existe."));
         if (proveedor.getRol() != Rol.PROVEEDOR) {
             throw new DomainException("El usuario indicado no es un proveedor.");
         }
@@ -142,12 +160,20 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
             throw new DomainException("La categoría es obligatoria.");
         }
         categoriaRepositoryPort.buscarPorId(categoriaId)
-                .orElseThrow(() -> new DomainException("La categoría no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("La categoría no existe."));
     }
 
     private void validarNombre(String nombre) {
         if (nombre == null || nombre.isBlank()) {
             throw new DomainException("El nombre de la herramienta es obligatorio.");
         }
+    }
+
+    private BigDecimal validarTarifa(BigDecimal tarifaDiaria) {
+        BigDecimal tarifa = new Dinero(tarifaDiaria).getMonto();
+        if (tarifa.signum() <= 0) {
+            throw new DomainException("La tarifa diaria debe ser mayor que cero.");
+        }
+        return tarifa;
     }
 }

@@ -1,6 +1,6 @@
 package com.example.tomcat.service;
 
-import com.example.tomcat.exception.DomainException;
+import com.example.tomcat.exception.RecursoNoEncontradoException;
 import com.example.tomcat.model.Pago;
 import com.example.tomcat.model.Reserva;
 import com.example.tomcat.port.in.ListarPagosUseCase;
@@ -43,14 +43,14 @@ public class ListarPagosService implements ListarPagosUseCase {
     @Override
     public Pago buscarPorId(Solicitante solicitante, Long id) {
         Pago pago = pagoRepositoryPort.buscarPorId(id)
-                .orElseThrow(() -> new DomainException("El pago no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("El pago no existe."));
         verificarReserva(solicitante, pago.getReservaId());
         return pago;
     }
 
     private void verificarReserva(Solicitante solicitante, Long reservaId) {
         Reserva reserva = reservaRepositoryPort.buscarPorId(reservaId)
-                .orElseThrow(() -> new DomainException("La reserva no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("La reserva no existe."));
         controlAcceso.verificarAccesoReserva(solicitante, reserva);
     }
 }

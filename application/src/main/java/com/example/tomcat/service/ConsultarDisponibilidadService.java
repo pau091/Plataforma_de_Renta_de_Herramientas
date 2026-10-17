@@ -1,6 +1,7 @@
 package com.example.tomcat.service;
 
 import com.example.tomcat.exception.DomainException;
+import com.example.tomcat.exception.RecursoNoEncontradoException;
 import com.example.tomcat.model.Herramienta;
 import com.example.tomcat.port.in.ConsultarDisponibilidadUseCase;
 import com.example.tomcat.repository.HerramientaRepositoryPort;
@@ -26,7 +27,7 @@ public class ConsultarDisponibilidadService implements ConsultarDisponibilidadUs
     public boolean estaDisponible(Long herramientaId, LocalDate fechaInicio, LocalDate fechaFin) {
         validarRango(fechaInicio, fechaFin);
         Herramienta herramienta = herramientaRepositoryPort.buscarPorId(herramientaId)
-                .orElseThrow(() -> new DomainException("La herramienta no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("La herramienta no existe."));
         return herramienta.estaDisponible()
                 && !reservaRepositoryPort.existeSolape(herramientaId, fechaInicio, fechaFin, null);
     }

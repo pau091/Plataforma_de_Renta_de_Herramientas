@@ -1,7 +1,9 @@
 package com.example.tomcat.service;
 
 import com.example.tomcat.exception.AccesoDenegadoException;
+import com.example.tomcat.exception.ConflictoException;
 import com.example.tomcat.exception.DomainException;
+import com.example.tomcat.exception.RecursoNoEncontradoException;
 import com.example.tomcat.model.Herramienta;
 import com.example.tomcat.model.Mantenimiento;
 import com.example.tomcat.model.Reserva;
@@ -55,7 +57,7 @@ public class GestionarReservaService implements GestionarReservaUseCase {
 
         if (herramientaId != null) {
             herramientaRepositoryPort.buscarPorId(herramientaId)
-                    .orElseThrow(() -> new DomainException("La herramienta no existe."));
+                    .orElseThrow(() -> new RecursoNoEncontradoException("La herramienta no existe."));
             reservas = reservas.stream().filter(r -> herramientaId.equals(r.getHerramientaId())).toList();
         }
         if (clienteId != null) {
@@ -75,12 +77,12 @@ public class GestionarReservaService implements GestionarReservaUseCase {
     public Reserva aceptar(Solicitante solicitante, Long id) {
         Reserva reserva = buscarParaGestionar(solicitante, id);
         Herramienta herramienta = herramientaRepositoryPort.buscarPorId(reserva.getHerramientaId())
-                .orElseThrow(() -> new DomainException("La herramienta no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("La herramienta no existe."));
         if (!herramienta.estaDisponible()) {
             throw new DomainException("La herramienta no está operativa para aceptar la reserva.");
         }
         if (reservaRepositoryPort.existeSolape(reserva.getHerramientaId(), reserva.getFechaInicio(), reserva.getFechaFin(), reserva.getId())) {
-            throw new DomainException("La herramienta ya tiene una reserva en esas fechas.");
+            throw new ConflictoException("La herramienta ya tiene una reserva en esas fechas.");
         }
         reserva.aceptar();
         return reservaRepositoryPort.guardar(reserva);
@@ -107,7 +109,7 @@ public class GestionarReservaService implements GestionarReservaUseCase {
         Reserva actualizada = reservaRepositoryPort.guardar(reserva);
 
         Herramienta herramienta = herramientaRepositoryPort.buscarPorId(reserva.getHerramientaId())
-                .orElseThrow(() -> new DomainException("La herramienta no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("La herramienta no existe."));
 
         if (actualizada.tieneDano()) {
             herramienta.cambiarEstado("MANTENIMIENTO");
@@ -135,7 +137,7 @@ public class GestionarReservaService implements GestionarReservaUseCase {
 
     private Reserva buscar(Long id) {
         return reservaRepositoryPort.buscarPorId(id)
-                .orElseThrow(() -> new DomainException("La reserva no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("La reserva no existe."));
     }
 
     private Reserva buscarParaGestionar(Solicitante solicitante, Long id) {

@@ -1,7 +1,7 @@
 package com.example.tomcat.service;
 
 import com.example.tomcat.exception.AccesoDenegadoException;
-import com.example.tomcat.exception.DomainException;
+import com.example.tomcat.exception.RecursoNoEncontradoException;
 import com.example.tomcat.model.Factura;
 import com.example.tomcat.port.in.GestionarFacturaUseCase;
 import com.example.tomcat.port.in.dto.Solicitante;
@@ -22,19 +22,19 @@ public class GestionarFacturaService implements GestionarFacturaUseCase {
     @Override
     public Factura buscarPorId(Solicitante solicitante, Long id) {
         return verificar(solicitante, facturaRepositoryPort.buscarPorId(id)
-                .orElseThrow(() -> new DomainException("La factura no existe.")));
+                .orElseThrow(() -> new RecursoNoEncontradoException("La factura no existe.")));
     }
 
     @Override
     public Factura buscarPorPago(Solicitante solicitante, Long pagoId) {
         return verificar(solicitante, facturaRepositoryPort.buscarPorPagoId(pagoId)
-                .orElseThrow(() -> new DomainException("No hay factura asociada al pago.")));
+                .orElseThrow(() -> new RecursoNoEncontradoException("No hay factura asociada al pago.")));
     }
 
     @Override
     public Factura buscarPorReserva(Solicitante solicitante, Long reservaId) {
         return verificar(solicitante, facturaRepositoryPort.buscarPorReservaId(reservaId)
-                .orElseThrow(() -> new DomainException("No hay factura asociada a la reserva.")));
+                .orElseThrow(() -> new RecursoNoEncontradoException("No hay factura asociada a la reserva.")));
     }
 
     @Override

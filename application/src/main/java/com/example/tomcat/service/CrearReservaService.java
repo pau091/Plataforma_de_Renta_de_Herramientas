@@ -1,7 +1,9 @@
 package com.example.tomcat.service;
 
 import com.example.tomcat.exception.AccesoDenegadoException;
+import com.example.tomcat.exception.ConflictoException;
 import com.example.tomcat.exception.DomainException;
+import com.example.tomcat.exception.RecursoNoEncontradoException;
 import com.example.tomcat.model.Herramienta;
 import com.example.tomcat.model.Reserva;
 import com.example.tomcat.model.Rol;
@@ -35,7 +37,7 @@ public class CrearReservaService implements CrearReservaUseCase {
         Long clienteReserva = resolverCliente(solicitante, clienteId);
 
         Herramienta herramienta = herramientaRepositoryPort.buscarPorId(herramientaId)
-                .orElseThrow(() -> new DomainException("La herramienta no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("La herramienta no existe."));
 
         if (!herramienta.estaDisponible()) {
             throw new DomainException("La herramienta no se encuentra disponible para renta.");
@@ -47,8 +49,11 @@ public class CrearReservaService implements CrearReservaUseCase {
         if (fechaInicio.isAfter(fechaFin)) {
             throw new DomainException("La fecha de inicio no puede ser posterior a la fecha fin.");
         }
+        if (fechaInicio.isBefore(LocalDate.now())) {
+            throw new DomainException("No se puede reservar con una fecha de inicio pasada.");
+        }
         if (reservaRepositoryPort.existeSolape(herramientaId, fechaInicio, fechaFin, null)) {
-            throw new DomainException("La herramienta ya tiene una reserva en esas fechas.");
+            throw new ConflictoException("La herramienta ya tiene una reserva en esas fechas.");
         }
 
         Reserva reserva = new Reserva(null, clienteReserva, herramientaId, fechaInicio, fechaFin, "PENDIENTE", null, null, null, null);
@@ -67,7 +72,7 @@ public class CrearReservaService implements CrearReservaUseCase {
             throw new DomainException("Debe indicar el clienteId para quien se crea la reserva.");
         }
         Usuario cliente = usuarioRepositoryPort.buscarPorId(clienteId)
-                .orElseThrow(() -> new DomainException("El cliente no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("El cliente no existe."));
         if (cliente.getRol() != Rol.CLIENTE) {
             throw new DomainException("El usuario indicado no es un cliente.");
         }

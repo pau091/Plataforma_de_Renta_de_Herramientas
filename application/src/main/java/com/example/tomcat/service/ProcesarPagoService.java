@@ -1,7 +1,9 @@
 package com.example.tomcat.service;
 
 import com.example.tomcat.exception.AccesoDenegadoException;
+import com.example.tomcat.exception.ConflictoException;
 import com.example.tomcat.exception.DomainException;
+import com.example.tomcat.exception.RecursoNoEncontradoException;
 import com.example.tomcat.model.Factura;
 import com.example.tomcat.model.Herramienta;
 import com.example.tomcat.model.Pago;
@@ -47,7 +49,7 @@ public class ProcesarPagoService implements ProcesarPagoUseCase {
     @Override
     public Pago procesar(Solicitante solicitante, Long reservaId, BigDecimal monto, String metodoPago) {
         Reserva reserva = reservaRepositoryPort.buscarPorId(reservaId)
-                .orElseThrow(() -> new DomainException("La reserva no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("La reserva no existe."));
         if (!solicitante.esAdmin() && !(solicitante.esCliente() && solicitante.esUsuario(reserva.getClienteId()))) {
             throw new AccesoDenegadoException("Solo el cliente que hizo la reserva puede pagarla.");
         }
@@ -56,13 +58,13 @@ public class ProcesarPagoService implements ProcesarPagoUseCase {
             throw new DomainException("La reserva debe estar aceptada para registrar un pago.");
         }
         if (pagoRepositoryPort.existePagoCompletado(reservaId)) {
-            throw new DomainException("La reserva ya tiene un pago completado.");
+            throw new ConflictoException("La reserva ya tiene un pago completado.");
         }
 
         Herramienta herramienta = herramientaRepositoryPort.buscarPorId(reserva.getHerramientaId())
-                .orElseThrow(() -> new DomainException("La herramienta no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("La herramienta no existe."));
         Usuario cliente = usuarioRepositoryPort.buscarPorId(reserva.getClienteId())
-                .orElseThrow(() -> new DomainException("El cliente no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("El cliente no existe."));
 
         BigDecimal esperado = herramienta.getTarifaDiaria().multiply(BigDecimal.valueOf(reserva.diasAlquiler()));
         Dinero dinero = new Dinero(monto);

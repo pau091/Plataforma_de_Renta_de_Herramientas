@@ -3,6 +3,11 @@ package com.example.tomcat.adapter.in.rest;
 import com.example.tomcat.model.Mantenimiento;
 import com.example.tomcat.port.in.GestionarMantenimientoUseCase;
 import com.example.tomcat.security.UsuarioAutenticado;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -38,7 +43,7 @@ public class MantenimientoController {
 
     @PostMapping
     public ResponseEntity<Mantenimiento> registrar(@AuthenticationPrincipal UsuarioAutenticado usuario,
-                                                   @RequestBody MantenimientoRequest request) {
+                                                   @Valid @RequestBody MantenimientoRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(gestionarMantenimientoUseCase.registrar(
                 usuario.solicitante(),
                 request.herramientaId(),
@@ -50,11 +55,23 @@ public class MantenimientoController {
     @PostMapping("/{id}/cerrar")
     public ResponseEntity<Mantenimiento> cerrar(@AuthenticationPrincipal UsuarioAutenticado usuario,
                                                 @PathVariable Long id,
-                                                @RequestBody CerrarRequest request) {
+                                                @Valid @RequestBody CerrarRequest request) {
         return ResponseEntity.ok(gestionarMantenimientoUseCase.cerrar(usuario.solicitante(), id, request.costoReparacion()));
     }
 
-    public record MantenimientoRequest(Long herramientaId, String descripcionProblema, BigDecimal costoReparacion) {}
+    public record MantenimientoRequest(
+            @NotNull(message = "La herramienta es obligatoria.")
+            Long herramientaId,
+            @NotBlank(message = "La descripción del problema es obligatoria.")
+            String descripcionProblema,
+            @PositiveOrZero(message = "El costo de reparación no puede ser negativo.")
+            @Digits(integer = 10, fraction = 2, message = "El costo admite hasta 10 enteros y 2 decimales.")
+            BigDecimal costoReparacion
+    ) {}
 
-    public record CerrarRequest(BigDecimal costoReparacion) {}
+    public record CerrarRequest(
+            @PositiveOrZero(message = "El costo de reparación no puede ser negativo.")
+            @Digits(integer = 10, fraction = 2, message = "El costo admite hasta 10 enteros y 2 decimales.")
+            BigDecimal costoReparacion
+    ) {}
 }

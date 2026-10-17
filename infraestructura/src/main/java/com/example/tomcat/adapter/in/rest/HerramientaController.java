@@ -3,6 +3,12 @@ package com.example.tomcat.adapter.in.rest;
 import com.example.tomcat.model.Herramienta;
 import com.example.tomcat.port.in.GestionarHerramientaUseCase;
 import com.example.tomcat.security.UsuarioAutenticado;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -48,7 +54,7 @@ public class HerramientaController {
 
     @PostMapping
     public ResponseEntity<Herramienta> crear(@AuthenticationPrincipal UsuarioAutenticado usuario,
-                                             @RequestBody HerramientaRequest request) {
+                                             @Valid @RequestBody CrearHerramientaRequest request) {
         // proveedorId solo se usa cuando quien registra es ADMIN; un PROVEEDOR siempre registra a su nombre.
         return ResponseEntity.status(HttpStatus.CREATED).body(gestionarHerramientaUseCase.crear(
                 usuario.solicitante(),
@@ -64,7 +70,7 @@ public class HerramientaController {
     @PutMapping("/{id}")
     public ResponseEntity<Herramienta> actualizar(@AuthenticationPrincipal UsuarioAutenticado usuario,
                                                   @PathVariable Long id,
-                                                  @RequestBody HerramientaRequest request) {
+                                                  @Valid @RequestBody ActualizarHerramientaRequest request) {
         return ResponseEntity.ok(gestionarHerramientaUseCase.actualizar(
                 usuario.solicitante(),
                 id,
@@ -80,14 +86,14 @@ public class HerramientaController {
     @PatchMapping("/{id}/estado")
     public ResponseEntity<Herramienta> cambiarEstado(@AuthenticationPrincipal UsuarioAutenticado usuario,
                                                      @PathVariable Long id,
-                                                     @RequestBody EstadoRequest request) {
+                                                     @Valid @RequestBody EstadoRequest request) {
         return ResponseEntity.ok(gestionarHerramientaUseCase.cambiarEstado(usuario.solicitante(), id, request.estado()));
     }
 
     @PatchMapping("/{id}/imagen")
     public ResponseEntity<Herramienta> actualizarImagen(@AuthenticationPrincipal UsuarioAutenticado usuario,
                                                         @PathVariable Long id,
-                                                        @RequestBody ImagenRequest request) {
+                                                        @Valid @RequestBody ImagenRequest request) {
         return ResponseEntity.ok(gestionarHerramientaUseCase.actualizarImagen(usuario.solicitante(), id, request.imagenUrl()));
     }
 
@@ -97,17 +103,45 @@ public class HerramientaController {
         return ResponseEntity.noContent().build();
     }
 
-    public record HerramientaRequest(
+    /** proveedorId solo lo usa un ADMIN; un PROVEEDOR siempre registra a su nombre. */
+    public record CrearHerramientaRequest(
             Long proveedorId,
+            @NotNull(message = "La categoría es obligatoria.")
             Long categoriaId,
+            @NotBlank(message = "El nombre de la herramienta es obligatorio.")
+            @Size(max = 150, message = "El nombre admite máximo 150 caracteres.")
             String nombre,
             String descripcion,
+            @NotNull(message = "La tarifa diaria es obligatoria.")
+            @Positive(message = "La tarifa diaria debe ser mayor que cero.")
+            @Digits(integer = 10, fraction = 2, message = "La tarifa admite hasta 10 enteros y 2 decimales.")
             BigDecimal tarifaDiaria,
-            String estado,
+            @Size(max = 500, message = "La URL de la imagen admite máximo 500 caracteres.")
             String imagenUrl
     ) {}
 
-    public record EstadoRequest(String estado) {}
+    /** Todos los campos son opcionales: solo se cambia lo que se envía. */
+    public record ActualizarHerramientaRequest(
+            Long categoriaId,
+            @Size(max = 150, message = "El nombre admite máximo 150 caracteres.")
+            String nombre,
+            String descripcion,
+            @Positive(message = "La tarifa diaria debe ser mayor que cero.")
+            @Digits(integer = 10, fraction = 2, message = "La tarifa admite hasta 10 enteros y 2 decimales.")
+            BigDecimal tarifaDiaria,
+            String estado,
+            @Size(max = 500, message = "La URL de la imagen admite máximo 500 caracteres.")
+            String imagenUrl
+    ) {}
 
-    public record ImagenRequest(String imagenUrl) {}
+    public record EstadoRequest(
+            @NotBlank(message = "El estado es obligatorio (DISPONIBLE, MANTENIMIENTO o FUERA_DE_SERVICIO).")
+            String estado
+    ) {}
+
+    public record ImagenRequest(
+            @NotBlank(message = "La URL de la imagen es obligatoria.")
+            @Size(max = 500, message = "La URL de la imagen admite máximo 500 caracteres.")
+            String imagenUrl
+    ) {}
 }

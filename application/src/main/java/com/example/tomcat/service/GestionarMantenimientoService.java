@@ -1,6 +1,8 @@
 package com.example.tomcat.service;
 
+import com.example.tomcat.exception.ConflictoException;
 import com.example.tomcat.exception.DomainException;
+import com.example.tomcat.exception.RecursoNoEncontradoException;
 import com.example.tomcat.model.Herramienta;
 import com.example.tomcat.model.Mantenimiento;
 import com.example.tomcat.model.Reserva;
@@ -38,11 +40,12 @@ public class GestionarMantenimientoService implements GestionarMantenimientoUseC
         if (descripcionProblema == null || descripcionProblema.isBlank()) {
             throw new DomainException("La descripción del problema es obligatoria.");
         }
+        validarCosto(costoReparacion);
 
         boolean abierto = mantenimientoRepositoryPort.listarPorHerramienta(herramientaId).stream()
                 .anyMatch(Mantenimiento::estaAbierto);
         if (abierto) {
-            throw new DomainException("La herramienta ya tiene un mantenimiento abierto.");
+            throw new ConflictoException("La herramienta ya tiene un mantenimiento abierto.");
         }
 
         herramienta.cambiarEstado("MANTENIMIENTO");
@@ -62,14 +65,19 @@ public class GestionarMantenimientoService implements GestionarMantenimientoUseC
     @Override
     public Mantenimiento cerrar(Solicitante solicitante, Long id, BigDecimal costoReparacion) {
         Mantenimiento mantenimiento = mantenimientoRepositoryPort.buscarPorId(id)
-                .orElseThrow(() -> new DomainException("El mantenimiento no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("El mantenimiento no existe."));
         Herramienta herramienta = buscarHerramientaPropia(solicitante, mantenimiento.getHerramientaId());
+        validarCosto(costoReparacion);
 
         mantenimiento.cerrar(costoReparacion);
         Mantenimiento cerrado = mantenimientoRepositoryPort.guardar(mantenimiento);
 
-        herramienta.cambiarEstado("DISPONIBLE");
-        herramientaRepositoryPort.guardar(herramienta);
+        // Solo vuelve a estar disponible si seguía en mantenimiento; si mientras tanto se marcó
+        // FUERA_DE_SERVICIO (por ejemplo, irreparable) conserva ese estado.
+        if ("MANTENIMIENTO".equals(herramienta.getEstado())) {
+            herramienta.cambiarEstado("DISPONIBLE");
+            herramientaRepositoryPort.guardar(herramienta);
+        }
         return cerrado;
     }
 
@@ -90,14 +98,20 @@ public class GestionarMantenimientoService implements GestionarMantenimientoUseC
     @Override
     public List<Mantenimiento> listarPorReserva(Solicitante solicitante, Long reservaId) {
         Reserva reserva = reservaRepositoryPort.buscarPorId(reservaId)
-                .orElseThrow(() -> new DomainException("La reserva no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("La reserva no existe."));
         controlAcceso.verificarGestionReserva(solicitante, reserva);
         return mantenimientoRepositoryPort.listarPorReserva(reservaId);
     }
 
+    private void validarCosto(BigDecimal costoReparacion) {
+        if (costoReparacion != null && costoReparacion.signum() < 0) {
+            throw new DomainException("El costo de reparación no puede ser negativo.");
+        }
+    }
+
     private Herramienta buscarHerramientaPropia(Solicitante solicitante, Long herramientaId) {
         Herramienta herramienta = herramientaRepositoryPort.buscarPorId(herramientaId)
-                .orElseThrow(() -> new DomainException("La herramienta no existe."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("La herramienta no existe."));
         controlAcceso.verificarPropietarioHerramienta(solicitante, herramienta);
         return herramienta;
     }

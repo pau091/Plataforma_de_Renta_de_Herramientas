@@ -1,6 +1,7 @@
 package com.example.tomcat.service;
 
 import com.example.tomcat.exception.AccesoDenegadoException;
+import com.example.tomcat.exception.ConflictoException;
 import com.example.tomcat.exception.DomainException;
 import com.example.tomcat.model.Rol;
 import com.example.tomcat.model.Usuario;
@@ -46,7 +47,7 @@ public class RegistrarUsuarioService implements RegistrarUsuarioUseCase {
             throw new DomainException("La contraseña debe tener al menos 8 caracteres.");
         }
         if (usuarioRepositoryPort.buscarPorEmail(correo.getValor()).isPresent()) {
-            throw new DomainException("El correo ya se encuentra registrado.");
+            throw new ConflictoException("El correo ya se encuentra registrado.");
         }
 
         Usuario nuevoUsuario = new Usuario(

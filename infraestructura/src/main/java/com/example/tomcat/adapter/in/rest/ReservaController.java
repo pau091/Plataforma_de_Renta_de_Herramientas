@@ -6,6 +6,11 @@ import com.example.tomcat.port.in.ConsultarDisponibilidadUseCase;
 import com.example.tomcat.port.in.CrearReservaUseCase;
 import com.example.tomcat.port.in.GestionarReservaUseCase;
 import com.example.tomcat.security.UsuarioAutenticado;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.FutureOrPresent;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -35,7 +40,7 @@ public class ReservaController {
     /** La reserva queda PENDIENTE hasta que el proveedor la acepte o la rechace. */
     @PostMapping
     public ResponseEntity<Reserva> crear(@AuthenticationPrincipal UsuarioAutenticado usuario,
-                                         @RequestBody ReservaRequest request) {
+                                         @Valid @RequestBody ReservaRequest request) {
         // clienteId solo se usa cuando quien reserva es ADMIN; un CLIENTE siempre reserva a su nombre.
         return ResponseEntity.status(HttpStatus.CREATED).body(crearReservaUseCase.crear(
                 usuario.solicitante(),
@@ -79,7 +84,7 @@ public class ReservaController {
     @PostMapping("/{id}/devolver")
     public ResponseEntity<Reserva> devolver(@AuthenticationPrincipal UsuarioAutenticado usuario,
                                             @PathVariable Long id,
-                                            @RequestBody DevolucionRequest request) {
+                                            @Valid @RequestBody DevolucionRequest request) {
         return ResponseEntity.ok(gestionarReservaUseCase.devolver(
                 usuario.solicitante(), id, request.estadoEquipo(), request.observaciones()));
     }
@@ -103,9 +108,23 @@ public class ReservaController {
     }
 
     /** clienteId es opcional: solo lo usa un ADMIN que reserva en nombre de un cliente. */
-    public record ReservaRequest(Long clienteId, Long herramientaId, LocalDate fechaInicio, LocalDate fechaFin) {}
+    public record ReservaRequest(
+            Long clienteId,
+            @NotNull(message = "La herramienta es obligatoria.")
+            Long herramientaId,
+            @NotNull(message = "La fecha de inicio es obligatoria.")
+            @FutureOrPresent(message = "La fecha de inicio no puede ser pasada.")
+            LocalDate fechaInicio,
+            @NotNull(message = "La fecha fin es obligatoria.")
+            LocalDate fechaFin
+    ) {}
 
-    public record DevolucionRequest(String estadoEquipo, String observaciones) {}
+    public record DevolucionRequest(
+            @NotBlank(message = "El estado del equipo es obligatorio (BUENO, DANADO o PERDIDO).")
+            String estadoEquipo,
+            @Size(max = 1000, message = "Las observaciones admiten máximo 1000 caracteres.")
+            String observaciones
+    ) {}
 
     public record DisponibilidadResponse(Long herramientaId, LocalDate fechaInicio, LocalDate fechaFin, boolean disponible) {}
 }

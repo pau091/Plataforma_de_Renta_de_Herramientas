@@ -5,6 +5,10 @@ import com.example.tomcat.exception.DomainException;
 import com.example.tomcat.model.Usuario;
 import com.example.tomcat.port.in.GestionarUsuarioUseCase;
 import com.example.tomcat.port.in.RegistrarUsuarioUseCase;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,7 +30,7 @@ public class UsuarioController {
 
     /** Solo ADMIN (ver SecurityConfig): da de alta proveedores o clientes. */
     @PostMapping
-    public ResponseEntity<UsuarioResponse> crear(@RequestBody CrearUsuarioRequest request) {
+    public ResponseEntity<UsuarioResponse> crear(@Valid @RequestBody CrearUsuarioRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(UsuarioResponse.from(registrarUsuarioUseCase.registrar(
                 request.nombre(),
                 request.email(),
@@ -56,7 +60,7 @@ public class UsuarioController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<UsuarioResponse> actualizar(@PathVariable Long id, @RequestBody ActualizarUsuarioRequest request) {
+    public ResponseEntity<UsuarioResponse> actualizar(@PathVariable Long id, @Valid @RequestBody ActualizarUsuarioRequest request) {
         return ResponseEntity.ok(UsuarioResponse.from(gestionarUsuarioUseCase.actualizar(
                 id,
                 request.nombre(),
@@ -88,7 +92,30 @@ public class UsuarioController {
         throw new DomainException("Solo se pueden listar clientes y proveedores.");
     }
 
-    public record CrearUsuarioRequest(String nombre, String email, String password, String rol) {}
+    public record CrearUsuarioRequest(
+            @NotBlank(message = "El nombre es obligatorio.")
+            @Size(max = 100, message = "El nombre admite máximo 100 caracteres.")
+            String nombre,
+            @NotBlank(message = "El correo es obligatorio.")
+            @Email(message = "El formato del correo electrónico no es válido.")
+            @Size(max = 150, message = "El correo admite máximo 150 caracteres.")
+            String email,
+            @NotBlank(message = "La contraseña es obligatoria.")
+            @Size(min = 8, max = 72, message = "La contraseña debe tener entre 8 y 72 caracteres.")
+            String password,
+            @NotBlank(message = "El rol es obligatorio (PROVEEDOR o CLIENTE).")
+            String rol
+    ) {}
 
-    public record ActualizarUsuarioRequest(String nombre, String email, Boolean activo, String password) {}
+    /** Todos los campos son opcionales: solo se cambia lo que se envía. */
+    public record ActualizarUsuarioRequest(
+            @Size(max = 100, message = "El nombre admite máximo 100 caracteres.")
+            String nombre,
+            @Email(message = "El formato del correo electrónico no es válido.")
+            @Size(max = 150, message = "El correo admite máximo 150 caracteres.")
+            String email,
+            Boolean activo,
+            @Size(min = 8, max = 72, message = "La contraseña debe tener entre 8 y 72 caracteres.")
+            String password
+    ) {}
 }

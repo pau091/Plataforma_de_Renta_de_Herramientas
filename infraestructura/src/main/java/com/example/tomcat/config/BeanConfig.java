@@ -35,9 +35,23 @@ import com.example.tomcat.service.ProcesarPagoService;
 import com.example.tomcat.service.RegistrarUsuarioService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
 
+/**
+ * Crea los casos de uso de la capa application (que no conoce Spring) y los envuelve en
+ * {@link TransaccionalProxy}: cada llamada a un caso de uso es una transacción completa.
+ */
 @Configuration
 public class BeanConfig {
+
+    private static final boolean ESCRITURA = false;
+    private static final boolean LECTURA = true;
+
+    private final PlatformTransactionManager tx;
+
+    public BeanConfig(PlatformTransactionManager transactionManager) {
+        this.tx = transactionManager;
+    }
 
     @Bean
     public ControlAcceso controlAcceso(HerramientaRepositoryPort herramientaRepository) {
@@ -49,7 +63,8 @@ public class BeanConfig {
             UsuarioRepositoryPort usuarioRepository,
             PasswordHasherPort passwordHasherPort
     ) {
-        return new RegistrarUsuarioService(usuarioRepository, passwordHasherPort);
+        return TransaccionalProxy.envolver(RegistrarUsuarioUseCase.class,
+                new RegistrarUsuarioService(usuarioRepository, passwordHasherPort), tx, ESCRITURA);
     }
 
     @Bean
@@ -57,15 +72,20 @@ public class BeanConfig {
             UsuarioRepositoryPort usuarioRepository,
             PasswordHasherPort passwordHasherPort
     ) {
-        return new AutenticarUsuarioService(usuarioRepository, passwordHasherPort);
+        return TransaccionalProxy.envolver(AutenticarUsuarioUseCase.class,
+                new AutenticarUsuarioService(usuarioRepository, passwordHasherPort), tx, LECTURA);
     }
 
     @Bean
     public GestionarUsuarioUseCase gestionarUsuarioUseCase(
             UsuarioRepositoryPort usuarioRepository,
+            HerramientaRepositoryPort herramientaRepository,
+            ReservaRepositoryPort reservaRepository,
             PasswordHasherPort passwordHasherPort
     ) {
-        return new GestionarUsuarioService(usuarioRepository, passwordHasherPort);
+        return TransaccionalProxy.envolver(GestionarUsuarioUseCase.class,
+                new GestionarUsuarioService(usuarioRepository, herramientaRepository, reservaRepository, passwordHasherPort),
+                tx, ESCRITURA);
     }
 
     @Bean
@@ -73,9 +93,14 @@ public class BeanConfig {
             HerramientaRepositoryPort herramientaRepository,
             UsuarioRepositoryPort usuarioRepository,
             CategoriaRepositoryPort categoriaRepository,
+            ReservaRepositoryPort reservaRepository,
+            MantenimientoRepositoryPort mantenimientoRepository,
             ControlAcceso controlAcceso
     ) {
-        return new GestionarHerramientaService(herramientaRepository, usuarioRepository, categoriaRepository, controlAcceso);
+        return TransaccionalProxy.envolver(GestionarHerramientaUseCase.class,
+                new GestionarHerramientaService(herramientaRepository, usuarioRepository, categoriaRepository,
+                        reservaRepository, mantenimientoRepository, controlAcceso),
+                tx, ESCRITURA);
     }
 
     @Bean
@@ -84,7 +109,8 @@ public class BeanConfig {
             UsuarioRepositoryPort usuarioRepository,
             ReservaRepositoryPort reservaRepository
     ) {
-        return new CrearReservaService(herramientaRepository, usuarioRepository, reservaRepository);
+        return TransaccionalProxy.envolver(CrearReservaUseCase.class,
+                new CrearReservaService(herramientaRepository, usuarioRepository, reservaRepository), tx, ESCRITURA);
     }
 
     @Bean
@@ -94,7 +120,9 @@ public class BeanConfig {
             MantenimientoRepositoryPort mantenimientoRepository,
             ControlAcceso controlAcceso
     ) {
-        return new GestionarReservaService(reservaRepository, herramientaRepository, mantenimientoRepository, controlAcceso);
+        return TransaccionalProxy.envolver(GestionarReservaUseCase.class,
+                new GestionarReservaService(reservaRepository, herramientaRepository, mantenimientoRepository, controlAcceso),
+                tx, ESCRITURA);
     }
 
     @Bean
@@ -102,7 +130,8 @@ public class BeanConfig {
             HerramientaRepositoryPort herramientaRepository,
             ReservaRepositoryPort reservaRepository
     ) {
-        return new ConsultarDisponibilidadService(herramientaRepository, reservaRepository);
+        return TransaccionalProxy.envolver(ConsultarDisponibilidadUseCase.class,
+                new ConsultarDisponibilidadService(herramientaRepository, reservaRepository), tx, LECTURA);
     }
 
     @Bean
@@ -113,12 +142,15 @@ public class BeanConfig {
             UsuarioRepositoryPort usuarioRepository,
             FacturaRepositoryPort facturaRepository
     ) {
-        return new ProcesarPagoService(pagoRepository, reservaRepository, herramientaRepository, usuarioRepository, facturaRepository);
+        return TransaccionalProxy.envolver(ProcesarPagoUseCase.class,
+                new ProcesarPagoService(pagoRepository, reservaRepository, herramientaRepository, usuarioRepository, facturaRepository),
+                tx, ESCRITURA);
     }
 
     @Bean
     public GestionarFacturaUseCase gestionarFacturaUseCase(FacturaRepositoryPort facturaRepository, ControlAcceso controlAcceso) {
-        return new GestionarFacturaService(facturaRepository, controlAcceso);
+        return TransaccionalProxy.envolver(GestionarFacturaUseCase.class,
+                new GestionarFacturaService(facturaRepository, controlAcceso), tx, LECTURA);
     }
 
     @Bean
@@ -128,7 +160,9 @@ public class BeanConfig {
             HerramientaRepositoryPort herramientaRepository,
             UsuarioRepositoryPort usuarioRepository
     ) {
-        return new ConsultarReportesService(pagoRepository, reservaRepository, herramientaRepository, usuarioRepository);
+        return TransaccionalProxy.envolver(ConsultarReportesUseCase.class,
+                new ConsultarReportesService(pagoRepository, reservaRepository, herramientaRepository, usuarioRepository),
+                tx, LECTURA);
     }
 
     @Bean
@@ -137,7 +171,8 @@ public class BeanConfig {
             ReservaRepositoryPort reservaRepository,
             ControlAcceso controlAcceso
     ) {
-        return new ListarPagosService(pagoRepository, reservaRepository, controlAcceso);
+        return TransaccionalProxy.envolver(ListarPagosUseCase.class,
+                new ListarPagosService(pagoRepository, reservaRepository, controlAcceso), tx, LECTURA);
     }
 
     @Bean
@@ -147,6 +182,8 @@ public class BeanConfig {
             ReservaRepositoryPort reservaRepository,
             ControlAcceso controlAcceso
     ) {
-        return new GestionarMantenimientoService(mantenimientoRepository, herramientaRepository, reservaRepository, controlAcceso);
+        return TransaccionalProxy.envolver(GestionarMantenimientoUseCase.class,
+                new GestionarMantenimientoService(mantenimientoRepository, herramientaRepository, reservaRepository, controlAcceso),
+                tx, ESCRITURA);
     }
 }

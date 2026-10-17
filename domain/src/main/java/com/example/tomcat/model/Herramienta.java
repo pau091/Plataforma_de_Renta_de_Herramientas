@@ -45,7 +45,9 @@ public class Herramienta {
     public void actualizar(Long categoriaId, String nombre, String descripcion, BigDecimal tarifaDiaria, String estado, String imagenUrl) {
         this.categoriaId = categoriaId;
         this.nombre = nombre;
-        this.descripcion = descripcion;
+        if (descripcion != null) {
+            this.descripcion = descripcion;
+        }
         this.tarifaDiaria = tarifaDiaria;
         if (estado != null) {
             cambiarEstado(estado);
