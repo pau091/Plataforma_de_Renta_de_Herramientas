@@ -2,11 +2,11 @@
 -- Plataforma de Renta de Herramientas - Script de creación de la base de datos (MySQL 8)
 -- =====================================================================================================
 -- Esquema final equivalente al que construye Flyway al arrancar la aplicación con las migraciones
--- V1 a V11 (infraestructura/src/main/resources/db/migration). Úselo para crear la base a mano y luego
+-- V1 a V12 (infraestructura/src/main/resources/db/migration). Úselo para crear la base a mano y luego
 -- poblarla con sql/data.sql:
 --     mysql -u root -p < sql/schema.sql
 --     mysql -u root -p < sql/data.sql
--- Si después arranca la aplicación sobre esta base, Flyway la registra como versión 11
+-- Si después arranca la aplicación sobre esta base, Flyway la registra como versión 12
 -- (spring.flyway.baseline-version) y no vuelve a ejecutar las migraciones.
 --
 -- Modelo (3FN):

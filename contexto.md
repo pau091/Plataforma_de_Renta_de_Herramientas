@@ -313,7 +313,7 @@ PENDIENTE --(proveedor acepta)--> ACEPTADA --(cliente paga = confirmación autom
 ## 8. Base de datos y migraciones (Flyway, `infraestructura/src/main/resources/db/migration/`)
 
 `spring.jpa.hibernate.ddl-auto=validate`: el esquema lo define **solo Flyway**.
-**Nunca modifiques una migración ya aplicada**; crea una nueva. **La siguiente versión libre es V12.**
+**Nunca modifiques una migración ya aplicada**; crea una nueva. **La siguiente versión libre es V13** (`baseline-version` ya está en 12).
 Al agregar una migración, sube también `spring.flyway.baseline-version` en `application.yml` y regenera
 `sql/schema.sql` / `sql/data.sql` si cambian el esquema o los datos.
 
@@ -330,6 +330,7 @@ Al agregar una migración, sube también `spring.flyway.baseline-version` en `ap
 | V9 | `facturas.estado` (VIGENTE/ANULADA) e índice `idx_reservas_estado_devolucion`. Estados nuevos sin cambio de esquema: reserva CANCELADA y pago REEMBOLSADO |
 | V10 | Índice compuesto `idx_reservas_herramienta_fechas` (reemplaza a `idx_reservas_herramienta_id`), `idx_herramientas_estado`, `uk_categorias_nombre` y 10 restricciones `CHECK` (estados, montos, tarifa, fechas) |
 | V11 | Datos de demostración coherentes (ver abajo). Usa `UPDATE` sobre las filas de V2/V6 e `INSERT` con variables `@reserva_N` |
+| V12 | `imagen_url` de las 30 herramientas de demostración → `/images/herramientas/<slug>.jpg` (solo si no tienen imagen; valida id y nombre). `sql/data.sql` termina con los mismos `UPDATE` |
 
 **Datos de demostración (V11, igual a `sql/data.sql`):**
 - 3 roles, 41 usuarios (1 admin, 20 proveedores, 20 clientes), 20 categorías, 30 herramientas, 34 reservas,
@@ -430,6 +431,17 @@ ejecutar: Docker, local y Tomcat externo con `setenv`, `application.properties` 
 demo, JWT y roles, CORS, tabla de endpoints con ejemplos JSON, reglas de negocio, frontend, pruebas, Postman y solución de
 problemas). Verificado desde un **clon limpio**. Hallazgo: en Windows, clonar en una ruta muy larga falla con
 `Filename too long` (documentado: `git config --global core.longpaths true`).
+
+**Mejoras de diseño (después de la Fase 8):**
+- Fotografías reales con licencia libre (Wikimedia Commons: dominio público, CC0, CC BY, CC BY-SA) para las 30 herramientas
+  y el fondo del inicio de sesión, en `static/images/herramientas/*.jpg` y `static/images/acceso-obra.jpg` (1000×750 y
+  1600×1000, ~4 MB en total). Autores y licencias en `docs/creditos-imagenes.md` (obligatorio por las CC BY / BY-SA).
+- Inicio de sesión rediseñado (`js/vistas/auth.js`): pantalla dividida con foto de obra, tipografía Inter (Google Fonts),
+  campos con íconos, mostrar/ocultar contraseña, registro por enlace y accesos de demostración.
+- Catálogo: la foto o el nombre abren una **ficha ampliada** (`modalReservar` en `comun.js`, modal-xl) con foto grande,
+  categoría, descripción, precio y reserva por fechas con disponibilidad en vivo.
+- `MigracionesYDatosIT` verifica que las 30 herramientas tengan foto y que cada archivo se sirva (175 pruebas en total).
+- Si Docker Desktop no está abierto, las pruebas `*IT` se omiten y la app de Docker no arranca: abrirlo primero.
 
 **Pendientes que dependen del usuario (no de código):**
 - El enunciado pide un repositorio **privado** llamado `Proyecto_RentaHerramientas_ApellidoNombre`, compartido con el

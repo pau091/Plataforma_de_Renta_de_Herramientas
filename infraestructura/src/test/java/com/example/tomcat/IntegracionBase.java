@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 /**
- * Base de las pruebas de integración: la aplicación completa (seguridad JWT, controllers, JPA y Flyway V1–V11)
+ * Base de las pruebas de integración: la aplicación completa (seguridad JWT, controllers, JPA y Flyway V1–V12)
  * contra un MySQL 8.4 real en Docker. Un solo contenedor y un solo contexto de Spring se comparten entre todas
  * las clases *IT; cada prueba crea sus propios datos para no depender de las demás.
  * Si Docker no está disponible, las pruebas se omiten (no fallan).

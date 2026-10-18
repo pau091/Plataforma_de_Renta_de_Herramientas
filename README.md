@@ -80,7 +80,7 @@ infraestructura → Spring Boot: controllers REST, seguridad JWT, JPA, Flyway, c
 │   ├── java/.../adapter/out/            Entidades JPA, repositorios Spring Data, mappers, almacenamiento en disco
 │   ├── java/.../security/               Filtro JWT, configuración de Spring Security, errores 401/403 en JSON
 │   ├── java/.../config/                 Cableado de casos de uso, transacciones, CORS, Swagger, vencimiento programado
-│   ├── resources/db/migration/          Migraciones Flyway V1–V11
+│   ├── resources/db/migration/          Migraciones Flyway V1–V12
 │   └── resources/static/                Frontend (index.html, css/, js/, images/)
 ├── sql/                schema.sql y data.sql (creación y población de la base)
 ├── docs/               Diagrama relacional (imagen y fuente Mermaid)
@@ -204,9 +204,9 @@ spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
 spring.jpa.hibernate.ddl-auto=validate
 spring.jpa.show-sql=true
 spring.flyway.enabled=true
-# Una base creada a mano con sql/schema.sql + sql/data.sql se registra como versión 11
+# Una base creada a mano con sql/schema.sql + sql/data.sql se registra como versión 12
 spring.flyway.baseline-on-migrate=true
-spring.flyway.baseline-version=11
+spring.flyway.baseline-version=12
 
 # Subida de imágenes
 spring.servlet.multipart.max-file-size=5MB
@@ -265,7 +265,7 @@ La fuente editable del diagrama está en [`docs/diagrama-er.mmd`](docs/diagrama-
 |---|---|
 | [`sql/schema.sql`](sql/schema.sql) | Creación de la base y de las 9 tablas, con llaves, restricciones e índices |
 | [`sql/data.sql`](sql/data.sql) | Datos de demostración |
-| `infraestructura/src/main/resources/db/migration/V1…V11` | Las mismas definiciones como migraciones Flyway: la aplicación las aplica sola al arrancar |
+| `infraestructura/src/main/resources/db/migration/V1…V12` | Las mismas definiciones como migraciones Flyway: la aplicación las aplica sola al arrancar |
 
 Para crear la base a mano:
 
@@ -274,7 +274,7 @@ mysql -u root -p < sql/schema.sql
 mysql -u root -p < sql/data.sql
 ```
 
-Si después arranca la aplicación sobre esa base, Flyway la reconoce como versión 11 y no vuelve a ejecutar las migraciones.
+Si después arranca la aplicación sobre esa base, Flyway la reconoce como versión 12 y no vuelve a ejecutar las migraciones.
 
 ### Datos de demostración
 
@@ -282,7 +282,7 @@ Si después arranca la aplicación sobre esa base, Flyway la reconoce como versi
 |---|---|
 | Usuarios | 41: 1 administrador, **20 proveedores** y **20 clientes** |
 | Categorías | 20 |
-| Herramientas | 30: 28 disponibles, 1 en mantenimiento y 1 fuera de servicio |
+| Herramientas | 30, todas con fotografía: 28 disponibles, 1 en mantenimiento y 1 fuera de servicio |
 | Reservas | 34, en los 8 estados posibles |
 | Pagos y facturas | 24 cada uno (uno reembolsado, con su factura anulada) |
 | Mantenimientos | 21 (uno abierto por una devolución con daño) |
@@ -536,6 +536,9 @@ Se sirve en http://localhost:8080 desde `infraestructura/src/main/resources/stat
   - usuarios, herramientas y categorías;
   - historial de alquileres e incidencias;
   - mantenimientos, pagos (corregir o reembolsar), facturas y reportes.
+
+Las fotografías de las herramientas y el fondo del inicio de sesión tienen licencia libre (Wikimedia Commons); sus autores
+y licencias están en [`docs/creditos-imagenes.md`](docs/creditos-imagenes.md).
 
 El token se guarda en `localStorage` y se envía en cada petición como `Authorization: Bearer`. Si el token vence o la cuenta se
 desactiva, la aplicación vuelve al inicio de sesión. Todo el texto que llega de la API se escapa antes de mostrarse (protección

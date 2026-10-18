@@ -23,10 +23,10 @@ class MigracionesYDatosIT extends IntegracionBase {
     }
 
     @Test
-    @DisplayName("Flyway aplica todas las migraciones (V1–V11) sin errores")
+    @DisplayName("Flyway aplica todas las migraciones (V1–V12) sin errores")
     void migracionesAplicadas() {
         assertThat(jdbc.queryForObject("SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history WHERE success = 1", Integer.class))
-                .isEqualTo(11);
+                .isEqualTo(12);
         assertThat(contar("SELECT COUNT(*) FROM flyway_schema_history WHERE success = 0")).isZero();
     }
 
@@ -57,6 +57,19 @@ class MigracionesYDatosIT extends IntegracionBase {
                 SELECT COUNT(*) FROM pagos p LEFT JOIN facturas f ON f.pago_id = p.id
                 WHERE f.id IS NULL OR f.total <> p.monto""")).isZero();
         assertThat(contar("SELECT COUNT(*) FROM reservas WHERE estado = 'FINALIZADA' AND fecha_devolucion IS NULL")).isZero();
+    }
+
+    @Test
+    @DisplayName("Las 30 herramientas de demostración tienen fotografía y el archivo se sirve")
+    void herramientasConFotografia() throws Exception {
+        var urls = jdbc.queryForList("SELECT imagen_url FROM herramientas WHERE id BETWEEN 1 AND 30", String.class);
+        assertThat(urls).hasSize(30).allSatisfy(url -> assertThat(url).startsWith("/images/herramientas/").endsWith(".jpg"));
+        for (String url : urls) {
+            var respuesta = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(url))
+                    .andReturn().getResponse();
+            assertThat(respuesta.getStatus()).as(url).isEqualTo(200);
+            assertThat(respuesta.getContentType()).as(url).isEqualTo("image/jpeg");
+        }
     }
 
     @Test

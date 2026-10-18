@@ -8,12 +8,176 @@
 
 body {
     background-color: #f4f5f7;
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-/* ---------- acceso ---------- */
+/* ---------- acceso (inicio de sesión y registro) ---------- */
 .acceso {
-    background: linear-gradient(135deg, rgba(33, 37, 41, .95), rgba(33, 37, 41, .82)),
-                repeating-linear-gradient(45deg, #f5b70a 0 18px, #212529 18px 36px);
+    display: flex;
+    min-height: 100vh;
+    background-color: #fff;
+}
+
+.acceso-hero {
+    flex: 1 1 58%;
+    position: relative;
+    color: #fff;
+    background: #1f2328 url("../images/acceso-obra.jpg") center / cover no-repeat;
+}
+
+.acceso-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(160deg, rgba(20, 22, 26, .55) 0%, rgba(20, 22, 26, .78) 55%, rgba(20, 22, 26, .94) 100%);
+}
+
+.acceso-hero-contenido {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 720px;
+    padding: 3rem 3.5rem;
+}
+
+.acceso-beneficios i {
+    display: block;
+    font-size: 1.6rem;
+    color: var(--bs-warning);
+    margin-bottom: .4rem;
+}
+
+.acceso-beneficios span {
+    font-size: .9rem;
+    opacity: .85;
+}
+
+.acceso-panel {
+    flex: 1 1 42%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 1.5rem;
+}
+
+.acceso-formulario {
+    width: 100%;
+    max-width: 400px;
+}
+
+.marca {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    font-weight: 700;
+    font-size: 1.25rem;
+    letter-spacing: -.01em;
+}
+
+.marca-oscura {
+    color: #212529;
+}
+
+.marca-logo {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background-color: var(--bs-warning);
+    color: #212529;
+    font-size: 1.15rem;
+}
+
+.campo-acceso .input-group-text {
+    background-color: #fff;
+    color: #8a9099;
+    border-right: 0;
+}
+
+.campo-acceso .form-control {
+    border-left: 0;
+    padding-top: .65rem;
+    padding-bottom: .65rem;
+}
+
+.campo-acceso .btn-ver-clave {
+    border: 1px solid var(--bs-border-color);
+    border-left: 0;
+    color: #8a9099;
+    background-color: #fff;
+}
+
+.campo-acceso:focus-within .input-group-text,
+.campo-acceso:focus-within .form-control,
+.campo-acceso:focus-within .btn-ver-clave {
+    border-color: #f5b70a;
+}
+
+.campo-acceso .form-control:focus {
+    box-shadow: none;
+}
+
+.campo-acceso:focus-within {
+    border-radius: var(--bs-border-radius);
+    box-shadow: 0 0 0 .2rem rgba(245, 183, 10, .25);
+}
+
+.btn-acceso {
+    font-weight: 600;
+    padding-top: .75rem;
+    padding-bottom: .75rem;
+}
+
+.enlace-acceso {
+    color: #b38300;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.enlace-acceso:hover {
+    text-decoration: underline;
+}
+
+.separador {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    color: #8a9099;
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+}
+
+.separador::before,
+.separador::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--bs-border-color);
+}
+
+.btn-demo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .2rem;
+    padding: .6rem .25rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: .6rem;
+    font-size: .85rem;
+    color: #343a40;
+    background-color: #fff;
+}
+
+.btn-demo i {
+    font-size: 1.2rem;
+    color: #b38300;
+}
+
+.btn-demo:hover {
+    border-color: #f5b70a;
+    background-color: #fff8e1;
 }
 
 /* ---------- menú lateral ---------- */
@@ -117,16 +281,6 @@ body {
     padding: .65rem .75rem;
 }
 
-.acceso .nav-pills .nav-link {
-    color: #212529;
-}
-
-.acceso .nav-pills .nav-link.active {
-    background-color: var(--bs-warning);
-    color: #212529;
-    font-weight: 600;
-}
-
 /* ---------- tablas apiladas en móvil: cada fila se muestra como tarjeta ---------- */
 @media (max-width: 767.98px) {
     .tabla-apilada thead {
@@ -161,4 +315,67 @@ body {
     .tabla-apilada td[data-label=""]::before {
         display: none;
     }
+}
+
+/* ---------- catálogo: tarjeta y ficha ampliada ---------- */
+.herramienta-enlace {
+    position: relative;
+    display: block;
+    overflow: hidden;
+}
+
+.herramienta-enlace .herramienta-img {
+    transition: transform .3s ease;
+}
+
+.herramienta-enlace:hover .herramienta-img,
+.herramienta-enlace:focus-visible .herramienta-img {
+    transform: scale(1.05);
+}
+
+.herramienta-ver {
+    position: absolute;
+    right: .6rem;
+    bottom: .6rem;
+    padding: .25rem .6rem;
+    border-radius: 999px;
+    font-size: .8rem;
+    font-weight: 600;
+    color: #fff;
+    background-color: rgba(20, 22, 26, .72);
+    opacity: 0;
+    transition: opacity .2s ease;
+}
+
+.herramienta-enlace:hover .herramienta-ver,
+.herramienta-enlace:focus-visible .herramienta-ver {
+    opacity: 1;
+}
+
+.herramienta-img {
+    height: 190px;
+}
+
+.herramienta-detalle-img {
+    width: 100%;
+    height: 420px;
+    object-fit: cover;
+    border-radius: .75rem;
+    background-color: #e9ecef;
+}
+
+.herramienta-detalle-img.sin-imagen {
+    font-size: 4rem;
+}
+
+@media (max-width: 991.98px) {
+    .herramienta-detalle-img {
+        height: 260px;
+    }
+}
+
+/* La etiqueta de estado no se estira cuando el nombre de la herramienta ocupa varias líneas. */
+.herramienta-card .card-body .badge {
+    align-self: flex-start;
+    flex-shrink: 0;
 }

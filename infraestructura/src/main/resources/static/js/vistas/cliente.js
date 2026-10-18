@@ -94,9 +94,11 @@ export async function catalogo(contenedor) {
                 ? ` libres del ${fmtFecha(fechas.fechaInicio)} al ${fmtFecha(fechas.fechaFin)}` : ''}.</p>
             <div class="row g-3">${herramientas.map(h => html`
             <div class="col-sm-6 col-lg-4 col-xxl-3"><div class="card h-100 border-0 shadow-sm herramienta-card">
-                ${imagenHerramienta(h)}
+                <a href="#" class="herramienta-enlace" data-detalle="${h.id}" aria-label="Ver detalle de ${h.nombre}">
+                    ${imagenHerramienta(h)}<span class="herramienta-ver"><i aria-hidden="true" class="bi bi-arrows-angle-expand me-1"></i>Ver detalle</span></a>
                 <div class="card-body d-flex flex-column">
-                    <div class="d-flex justify-content-between gap-2"><h3 class="h6 mb-1">${h.nombre}</h3>${badge(h.estado)}</div>
+                    <div class="d-flex justify-content-between gap-2">
+                        <h3 class="h6 mb-1"><a href="#" class="text-reset text-decoration-none" data-detalle="${h.id}">${h.nombre}</a></h3>${badge(h.estado)}</div>
                     <div class="small text-muted mb-2"><i aria-hidden="true" class="bi bi-tag"></i> ${nombresCategorias.get(h.categoriaId)?.nombre || 'Sin categoría'}</div>
                     <p class="small flex-grow-1">${h.descripcion}</p>
                     <div class="d-flex justify-content-between align-items-center">
@@ -111,11 +113,14 @@ export async function catalogo(contenedor) {
     form.addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(buscar, 300); });
     form.addEventListener('submit', evento => evento.preventDefault());
     resultados.addEventListener('click', evento => {
-        const boton = evento.target.closest('[data-reservar]');
+        // La foto, el nombre y el botón "Reservar" abren la ficha ampliada con la reserva por fechas.
+        const boton = evento.target.closest('[data-reservar], [data-detalle]');
         if (!boton) return;
-        const herramienta = herramientas.find(h => h.id === Number(boton.dataset.reservar));
+        evento.preventDefault();
+        const herramienta = herramientas.find(h => h.id === Number(boton.dataset.reservar || boton.dataset.detalle));
         modalReservar(herramienta, () => { location.hash = '#/reservas'; }, {
             inicio: form.fechaInicio.value, fin: form.fechaFin.value,
+            categoria: nombresCategorias.get(herramienta.categoriaId)?.nombre,
         });
     });
     await buscar();

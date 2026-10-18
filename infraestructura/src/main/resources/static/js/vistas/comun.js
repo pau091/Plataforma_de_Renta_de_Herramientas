@@ -221,28 +221,74 @@ function validarRango(datos) {
     }
 }
 
-/** Reservar una herramienta (CLIENTE). Verifica la disponibilidad antes de enviar la solicitud. */
-export function modalReservar(herramienta, alTerminar, { inicio = '', fin = '' } = {}) {
-    abrirModal({
-        titulo: `Reservar: ${herramienta.nombre}`,
-        textoConfirmar: 'Enviar solicitud',
-        cuerpo: html`<div class="d-flex gap-3 mb-3">${imagenHerramienta(herramienta, 'herramienta-mini')}
-            <div><div class="fw-semibold">${herramienta.nombre}</div><div class="text-muted small">${herramienta.descripcion}</div>
-            <div class="text-success fw-bold">${fmtMoneda(herramienta.tarifaDiaria)} / día</div></div></div>
-            ${camposFechas(inicio, fin)}
-            <p class="small text-muted mt-3 mb-0"><i aria-hidden="true" class="bi bi-info-circle"></i> La solicitud queda pendiente hasta que el
-            proveedor la acepte (tiene ${PLAZO_MINUTOS} minutos). Después tendrá ${PLAZO_MINUTOS} minutos para pagarla y
-            confirmar el alquiler.</p>`,
-        alAbrir: form => enlazarResumen(form, herramienta.tarifaDiaria),
+/**
+ * Ficha ampliada de una herramienta (CLIENTE): foto grande, descripción, precio y reserva por fechas.
+ * Mientras se eligen las fechas consulta la disponibilidad real y calcula el total.
+ */
+export function modalReservar(herramienta, alTerminar, { inicio = '', fin = '', categoria = '' } = {}) {
+    const disponible = herramienta.estado === 'DISPONIBLE';
+    const nodo = abrirModal({
+        titulo: 'Detalle de la herramienta',
+        tamano: 'modal-xl',
+        soloLectura: !disponible,
+        textoConfirmar: 'Solicitar reserva',
+        cuerpo: html`<div class="row g-4 detalle-herramienta">
+            <div class="col-lg-7">${imagenHerramienta(herramienta, 'herramienta-detalle-img')}</div>
+            <div class="col-lg-5 d-flex flex-column">
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    ${categoria ? html`<span class="badge rounded-pill text-bg-light border"><i aria-hidden="true" class="bi bi-tag me-1"></i>${categoria}</span>` : ''}
+                    ${badge(herramienta.estado)}</div>
+                <h3 class="h4 fw-bold mb-2">${herramienta.nombre}</h3>
+                <p class="text-secondary">${herramienta.descripcion || 'Sin descripción.'}</p>
+                <div class="precio-detalle mb-3"><span class="fs-3 fw-bold">${fmtMoneda(herramienta.tarifaDiaria)}</span>
+                    <span class="text-secondary"> / día</span></div>
+                ${disponible ? html`
+                    <div class="border rounded-3 p-3 bg-light-subtle">
+                        <div class="fw-semibold mb-2"><i aria-hidden="true" class="bi bi-calendar-range me-1"></i>Elige las fechas del alquiler</div>
+                        ${camposFechas(inicio, fin)}
+                        <div class="small mt-2" data-disponibilidad></div>
+                    </div>
+                    <p class="small text-secondary mt-3 mb-0"><i aria-hidden="true" class="bi bi-info-circle"></i> La solicitud queda
+                        pendiente hasta que el proveedor la acepte (tiene ${PLAZO_MINUTOS} minutos). Después tendrás ${PLAZO_MINUTOS}
+                        minutos para pagarla y confirmar el alquiler.</p>`
+                    : html`<div class="alert alert-warning mb-0"><i aria-hidden="true" class="bi bi-exclamation-triangle me-1"></i>
+                        Esta herramienta no está disponible para reservar en este momento.</div>`}
+            </div></div>`,
+        alAbrir: form => {
+            if (!disponible) return;
+            enlazarResumen(form, herramienta.tarifaDiaria);
+            const indicador = form.querySelector('[data-disponibilidad]');
+            let consulta = 0;
+            const revisar = async () => {
+                const datos = { fechaInicio: form.fechaInicio.value, fechaFin: form.fechaFin.value };
+                if (diasAlquiler(datos.fechaInicio, datos.fechaFin) < 1) {
+                    indicador.innerHTML = '';
+                    return;
+                }
+                const actual = ++consulta;
+                try {
+                    const r = await api.get(conParametros(`/reservas/disponibilidad/${herramienta.id}`, datos));
+                    if (actual !== consulta) return; // llegó una respuesta vieja
+                    indicador.innerHTML = r.disponible
+                        ? html`<span class="text-success"><i aria-hidden="true" class="bi bi-check-circle-fill me-1"></i>Disponible en esas fechas</span>`
+                        : html`<span class="text-danger"><i aria-hidden="true" class="bi bi-x-circle-fill me-1"></i>Ya está reservada en esas fechas</span>`;
+                } catch {
+                    indicador.innerHTML = '';
+                }
+            };
+            form.addEventListener('change', revisar);
+            revisar();
+        },
         alConfirmar: async (form, datos) => {
             validarRango(datos);
             const consulta = await api.get(conParametros(`/reservas/disponibilidad/${herramienta.id}`, datos));
             if (!consulta.disponible) throw new Error('La herramienta ya está reservada en esas fechas. Elija otras.');
-            const reserva = await api.post('/reservas', { herramientaId: herramienta.id, ...datos });
+            const reserva = await api.post('/reservas', { herramientaId: herramienta.id, fechaInicio: datos.fechaInicio, fechaFin: datos.fechaFin });
             toast(`Solicitud #${reserva.id} enviada. Le avisaremos en "Mis reservas" cuando el proveedor responda.`);
             alTerminar?.();
         },
     });
+    return nodo;
 }
 
 function modalFechas(reserva, herramienta, recargar) {
