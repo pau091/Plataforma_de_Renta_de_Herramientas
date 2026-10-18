@@ -377,7 +377,7 @@ Para probar los plazos sin esperar, se adelanta el tiempo en la base temporal, p
 | 5. Documentación de la API: Swagger completo (56 operaciones) y colección de Postman (`postman/`) | ✅ (auditoría del OpenAPI sin problemas; Newman 97 peticiones / 195 aserciones OK, repetible) | pendiente (lo hace el usuario) |
 | 6. Frontend por rol (HTML/CSS/JS puro + Bootstrap 5, responsivo) | ✅ (prueba de punta a punta con Edge/Playwright: 37/37, sin errores JS; revisión visual escritorio y móvil) | pendiente (lo hace el usuario) |
 | 7. Pruebas automatizadas: 127 unitarias (dominio + servicios con Mockito) y 47 de integración (MockMvc + Testcontainers MySQL 8.4) | ✅ (`./mvnw verify`: 174/174 OK) | pendiente (lo hace el usuario) |
-| **8. Cierre: README y verificación final** | ⏳ **Siguiente** | — |
+| 8. Cierre: README completo y verificación final desde un clon limpio | ✅ (`mvnw verify` 174/174, Swagger sin problemas, Newman 97/195, frontend 37/37) | pendiente (lo hace el usuario) |
 
 **Postman (`postman/`):** colección `Renta_Herramientas.postman_collection.json` (9 carpetas, 97 peticiones con
 pruebas), entorno `Renta_Herramientas.postman_environment.json` (`baseUrl`, `clave`) y `herramienta-demo.png` para la
@@ -425,8 +425,17 @@ Bootstrap Icons 1.11.3 por CDN (versiones fijas). Navegación por `#/ruta`; men�
   `testcontainers.version` en **1.21.4**. Si se actualiza Spring Boot, revisar esa propiedad.
 - Se comprobó que las pruebas detectan errores reales (mutación temporal de `ControlAcceso` → fallan las 2 pruebas de esa regla).
 
-**Fase 8:** el README actual está incompleto: se corta en la sección de clonar y menciona PostgreSQL.
-Debe cubrir lo que pide el enunciado (sección 4 de `explicacion.md`).
+**Fase 8 (cierre):** `README.md` reescrito para el trainer (funcionalidades, tecnologías, arquitectura, 3 formas de
+ejecutar: Docker, local y Tomcat externo con `setenv`, `application.properties` de ejemplo, diagrama, scripts SQL, datos
+demo, JWT y roles, CORS, tabla de endpoints con ejemplos JSON, reglas de negocio, frontend, pruebas, Postman y solución de
+problemas). Verificado desde un **clon limpio**. Hallazgo: en Windows, clonar en una ruta muy larga falla con
+`Filename too long` (documentado: `git config --global core.longpaths true`).
+
+**Pendientes que dependen del usuario (no de código):**
+- El enunciado pide un repositorio **privado** llamado `Proyecto_RentaHerramientas_ApellidoNombre`, compartido con el
+  trainer. El remoto actual es `pau091/Plataforma_de_Renta_de_Herramientas`: renombrarlo en GitHub (Settings → Rename),
+  hacerlo privado, invitar al trainer y actualizar la URL de `git clone` en el README y el remoto local.
+- Decidir si `contexto.md` (documento interno de traspaso) se queda en el repositorio entregado.
 
 ---
 
