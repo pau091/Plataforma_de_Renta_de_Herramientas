@@ -8,7 +8,7 @@ devoluciones con daños y la rentabilidad de la plataforma.
 - **Base de datos:** MySQL 8 con migraciones Flyway, scripts SQL y datos de demostración (20 o más registros por entidad).
 - **Frontend:** HTML, CSS y JavaScript puro con Bootstrap 5, responsivo, con un panel distinto para cada rol.
 - **Despliegue:** WAR en **Apache Tomcat 10.1** (con Docker Compose o en un Tomcat instalado).
-- **Documentación y pruebas:** Swagger con ejemplos JSON, colección de Postman y 174 pruebas automatizadas.
+- **Documentación y pruebas:** Swagger con ejemplos JSON, colección de Postman y 175 pruebas automatizadas.
 
 ---
 
@@ -560,7 +560,7 @@ En Windows PowerShell use `.\mvnw.cmd test` y `.\mvnw.cmd verify`.
 |---|---|---|---|
 | Unitarias de dominio | `domain/src/test` | 76 | Ciclo de vida de la reserva, vencimiento, cancelación, devolución, pagos, facturas, herramientas y objetos de valor |
 | Unitarias de servicios | `application/src/test` | 51 | Reglas de negocio y de acceso por rol con Mockito y un reloj fijo (reservas, pagos, reembolsos, autenticación, reportes, imágenes) |
-| Integración | `infraestructura/src/test` (`*IT`) | 47 | La aplicación completa contra un **MySQL 8.4 real en Docker** (Testcontainers): migraciones, seguridad JWT y permisos, flujos completos por HTTP, imágenes, CRUD y restricciones de la base |
+| Integración | `infraestructura/src/test` (`*IT`) | 48 | La aplicación completa contra un **MySQL 8.4 real en Docker** (Testcontainers): migraciones, seguridad JWT y permisos, flujos completos por HTTP, imágenes (incluidas las fotos de demostración), CRUD y restricciones de la base |
 
 - Las pruebas de integración arrancan su propio MySQL temporal; no usan la base de Docker Compose.
 - Si Docker no está disponible, se **omiten** en lugar de fallar.
