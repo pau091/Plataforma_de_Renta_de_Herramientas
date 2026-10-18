@@ -376,8 +376,8 @@ Para probar los plazos sin esperar, se adelanta el tiempo en la base temporal, p
 | 4. Base de datos: V10 (índices y CHECK), V11 (datos coherentes), `sql/schema.sql`, `sql/data.sql`, diagrama ER | ✅ (56 pruebas de datos/HTTP + comparación Flyway vs scripts + 71 de regresión) | pendiente (lo hace el usuario) |
 | 5. Documentación de la API: Swagger completo (56 operaciones) y colección de Postman (`postman/`) | ✅ (auditoría del OpenAPI sin problemas; Newman 97 peticiones / 195 aserciones OK, repetible) | pendiente (lo hace el usuario) |
 | 6. Frontend por rol (HTML/CSS/JS puro + Bootstrap 5, responsivo) | ✅ (prueba de punta a punta con Edge/Playwright: 37/37, sin errores JS; revisión visual escritorio y móvil) | pendiente (lo hace el usuario) |
-| **7. Pruebas automatizadas** | ⏳ **Siguiente** | — |
-| 8. Cierre: README y verificación final | Pendiente | — |
+| 7. Pruebas automatizadas: 127 unitarias (dominio + servicios con Mockito) y 47 de integración (MockMvc + Testcontainers MySQL 8.4) | ✅ (`./mvnw verify`: 174/174 OK) | pendiente (lo hace el usuario) |
+| **8. Cierre: README y verificación final** | ⏳ **Siguiente** | — |
 
 **Postman (`postman/`):** colección `Renta_Herramientas.postman_collection.json` (9 carpetas, 97 peticiones con
 pruebas), entorno `Renta_Herramientas.postman_environment.json` (`baseUrl`, `clave`) y `herramienta-demo.png` para la
@@ -408,9 +408,22 @@ Bootstrap Icons 1.11.3 por CDN (versiones fijas). Navegación por `#/ruta`; men�
   `app.reservas.plazo-maximo`, actualizarla).
 - `SecurityConfig` deja públicos `/`, `/index.html`, `/css/**`, `/js/**`, `/images/**` y `/uploads/**`.
 
-**Fase 7:** no existe `src/test` en ningún módulo. Plan:
-- unitarias de dominio y servicios con JUnit 5 + Mockito, inyectando un `Clock` fijo en `PoliticaVencimiento`;
-- integración de controllers y seguridad con MockMvc + Testcontainers MySQL (el usuario tiene Docker) o H2.
+**Pruebas (Fase 7):**
+- Comandos: `./mvnw test` = solo unitarias (rápidas, sin Docker). `./mvnw verify` = unitarias + integración (`*IT`, plugin
+  failsafe). Las de integración necesitan Docker; sin Docker se **omiten** (`@Testcontainers(disabledWithoutDocker = true)`).
+- `domain/src/test`: `ReservaTest` (ciclo de vida, vencimiento, cancelación, fechas), `PagoYFacturaTest`,
+  `HerramientaYMantenimientoTest`, `ValueObjectsTest`. JUnit 5 + AssertJ (dependencias de prueba en el `pom` padre).
+- `application/src/test`: servicios con Mockito y un `Clock` fijo (`Datos.java`: 17/10/2026 15:00 Bogotá):
+  `ReservasServiceTest`, `PagosServiceTest`, `AutenticacionYRegistroTest`, `PoliticaYControlAccesoTest`,
+  `ConsultarReportesServiceTest`, `ValidadorImagenTest`.
+- `infraestructura/src/test`: `IntegracionBase` arranca **un** MySQL 8.4 (Testcontainers) y **un** contexto Spring para todas las
+  clases; desactiva el cron de vencimiento y usa una carpeta temporal para imágenes. Cada prueba crea sus propios datos.
+  `SeguridadIT` (JWT, 401/403 por rol, usuario desactivado, CORS, recursos públicos), `FlujoAlquilerIT` (flujo completo,
+  validaciones, PUT/DELETE de reservas, reembolso, vencimiento), `CatalogoYGestionIT` (filtros, inventario, imágenes,
+  categorías, usuarios), `MigracionesYDatosIT` (Flyway V1–V11, ≥20 registros, coherencia, CHECK y RESTRICT).
+- **Docker Engine 29+** rechaza la API que usa Testcontainers 1.19 (la de Spring Boot 3.2.5): por eso el `pom` padre fija
+  `testcontainers.version` en **1.21.4**. Si se actualiza Spring Boot, revisar esa propiedad.
+- Se comprobó que las pruebas detectan errores reales (mutación temporal de `ControlAcceso` → fallan las 2 pruebas de esa regla).
 
 **Fase 8:** el README actual está incompleto: se corta en la sección de clonar y menciona PostgreSQL.
 Debe cubrir lo que pide el enunciado (sección 4 de `explicacion.md`).
