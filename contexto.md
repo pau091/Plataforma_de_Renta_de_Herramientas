@@ -169,11 +169,21 @@ Paquete base: `com.example.tomcat`.
   - `VencimientoReservasScheduler`: corre al arrancar y luego según el cron.
   - `WebConfig`: publica `/uploads/**`.
   - `CorsConfig`: solo `localhost` y `127.0.0.1`.
-  - `OpenApiConfig`: esquema `bearerAuth`.
+  - `OpenApiConfig`: documentación Swagger. Bean `OpenAPI` (guía de JWT, roles, flujo, errores y cuentas de prueba
+    en Markdown; 10 etiquetas ordenadas) y un `OpenApiCustomizer` que: agrega ejemplos JSON reales a los modelos del
+    dominio (que no dependen de Swagger), registra el esquema `Error`, quita el candado de `/api/auth/**`, añade la 401
+    a todo lo protegido y convierte cada `@ApiResponse` de error (declarada solo con su descripción) en el esquema
+    `Error` con un ejemplo cuyo `message` es esa descripción. También pone 3 ejemplos (uno por rol) en `GET /api/panel`.
 - `TomcatApplication`: extiende `SpringBootServletInitializer` (WAR para Tomcat). Un bloque estático fija la
   zona por defecto de la JVM en **UTC**.
 
 **Convenciones:**
+- Documentación de cada endpoint: `@Tag` en la clase; en cada método `@Operation(summary, description con "**Rol(es):** ...")`
+  y `@ApiResponse` por código con el **mensaje real** de la excepción como descripción. Los métodos que responden 201/204
+  llevan `@ResponseStatus` para que springdoc muestre el código correcto. Los DTO de entrada llevan `@Schema(example=...)`
+  por campo. Los `LocalDateTime` se documentan con `@Schema(type = "string", ...)` (Swagger descarta ejemplos sin zona).
+- Los records internos de los reportes tienen nombres únicos (`ClienteFrecuente`, `HerramientaAlquilada`,
+  `HerramientaDisponibilidad`, `HerramientaRentabilidad`, `Incidencia`): con el nombre `Item` Swagger los mezclaba.
 - Los servicios **no tienen anotaciones de Spring**. Se cablean en `BeanConfig`.
 - Los controllers reciben `@AuthenticationPrincipal UsuarioAutenticado usuario` y pasan `usuario.solicitante()`
   al caso de uso. **Nunca se confía en ids de cliente o proveedor enviados en la petición.**
@@ -364,10 +374,19 @@ Para probar los plazos sin esperar, se adelanta el tiempo en la base temporal, p
 | 3. Funcionalidades: CRUD de categorías, subida de imágenes, vencimiento, panel; ajuste de confirmación automática y plazo de 1 h (V8) | ✅ (42 + 28 pruebas OK) | `3ba6c04`, `60eaaea` (los hizo el usuario) |
 | 3.5 Brechas frente al enunciado: CRUD de reservas (PUT/DELETE) y pagos (PUT/DELETE = reembolso), búsqueda por categoría, reportes de rentabilidad e incidencias (V9) | ✅ (71 pruebas HTTP OK) | pendiente (lo hace el usuario) |
 | 4. Base de datos: V10 (índices y CHECK), V11 (datos coherentes), `sql/schema.sql`, `sql/data.sql`, diagrama ER | ✅ (56 pruebas de datos/HTTP + comparación Flyway vs scripts + 71 de regresión) | pendiente (lo hace el usuario) |
-| **5. Documentación de la API: Swagger (`@Operation`, `@Tag`, ejemplos JSON) y colección de Postman** | ⏳ **Siguiente** | — |
-| 6. Frontend por rol | Pendiente | — |
+| 5. Documentación de la API: Swagger completo (56 operaciones) y colección de Postman (`postman/`) | ✅ (auditoría del OpenAPI sin problemas; Newman 97 peticiones / 195 aserciones OK, repetible) | pendiente (lo hace el usuario) |
+| **6. Frontend por rol** | ⏳ **Siguiente** | — |
 | 7. Pruebas automatizadas | Pendiente | — |
 | 8. Cierre: README y verificación final | Pendiente | — |
+
+**Postman (`postman/`):** colección `Renta_Herramientas.postman_collection.json` (9 carpetas, 97 peticiones con
+pruebas), entorno `Renta_Herramientas.postman_environment.json` (`baseUrl`, `clave`) y `herramienta-demo.png` para la
+subida multipart. Se ejecuta en orden (los logins guardan tokens y los pasos guardan ids). **Crea datos** en la base de
+`baseUrl`. Con Newman: `cd postman && npx newman run Renta_Herramientas.postman_collection.json -e Renta_Herramientas.postman_environment.json --working-dir .`
+(para otra URL: `--env-var baseUrl=http://localhost:8095`).
+
+**Compilar en Windows:** si `mvnw clean` falla con "Failed to delete target/classes" (OneDrive o el IDE lo bloquean),
+usar `./mvnw -q package -DskipTests` sin `clean`. Para pruebas, ejecutar una **copia** del `.war` (no el de `target/`).
 
 **Fase 6, qué falta:** hoy `infraestructura/src/main/resources/static/index.html` + `app.js` es mínimo:
 - Hay login, catálogo y un formulario de alta de herramienta.

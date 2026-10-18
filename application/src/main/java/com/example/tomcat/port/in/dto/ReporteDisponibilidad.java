@@ -7,7 +7,7 @@ public record ReporteDisponibilidad(
         long disponibles,
         long enMantenimiento,
         long fueraDeServicio,
-        List<Item> items
+        List<HerramientaDisponibilidad> items
 ) {
-    public record Item(Long id, String nombre, String estado, Long categoriaId, Long proveedorId, boolean operativa) {}
+    public record HerramientaDisponibilidad(Long id, String nombre, String estado, Long categoriaId, Long proveedorId, boolean operativa) {}
 }

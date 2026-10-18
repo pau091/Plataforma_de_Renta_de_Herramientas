@@ -78,15 +78,15 @@ public class ConsultarReportesService implements ConsultarReportesUseCase {
                 .collect(Collectors.groupingBy(Reserva::getHerramientaId, Collectors.counting()));
         Map<Long, BigDecimal> ingresos = ingresosPorReserva();
 
-        List<ReporteHerramientasMasAlquiladas.Item> items = herramientaRepositoryPort.listar().stream()
-                .map(herramienta -> new ReporteHerramientasMasAlquiladas.Item(
+        List<ReporteHerramientasMasAlquiladas.HerramientaAlquilada> items = herramientaRepositoryPort.listar().stream()
+                .map(herramienta -> new ReporteHerramientasMasAlquiladas.HerramientaAlquilada(
                         herramienta.getId(),
                         herramienta.getNombre(),
                         herramienta.getEstado(),
                         conteo.getOrDefault(herramienta.getId(), 0L),
                         ingresosPorHerramienta(herramienta.getId(), reservas, ingresos)
                 ))
-                .sorted(Comparator.comparing(ReporteHerramientasMasAlquiladas.Item::alquileres).reversed())
+                .sorted(Comparator.comparing(ReporteHerramientasMasAlquiladas.HerramientaAlquilada::alquileres).reversed())
                 .toList();
         return new ReporteHerramientasMasAlquiladas(items);
     }
@@ -98,16 +98,16 @@ public class ConsultarReportesService implements ConsultarReportesUseCase {
                 .collect(Collectors.groupingBy(Reserva::getClienteId, Collectors.counting()));
         Map<Long, BigDecimal> ingresos = ingresosPorReserva();
 
-        List<ReporteClientesFrecuentes.Item> items = usuarioRepositoryPort.listar().stream()
+        List<ReporteClientesFrecuentes.ClienteFrecuente> items = usuarioRepositoryPort.listar().stream()
                 .filter(usuario -> conteo.containsKey(usuario.getId()) || "CLIENTE".equals(usuario.getRol().name()))
-                .map(usuario -> new ReporteClientesFrecuentes.Item(
+                .map(usuario -> new ReporteClientesFrecuentes.ClienteFrecuente(
                         usuario.getId(),
                         usuario.getNombre(),
                         usuario.getEmail(),
                         conteo.getOrDefault(usuario.getId(), 0L),
                         totalPagadoCliente(usuario, reservas, ingresos)
                 ))
-                .sorted(Comparator.comparing(ReporteClientesFrecuentes.Item::reservas).reversed())
+                .sorted(Comparator.comparing(ReporteClientesFrecuentes.ClienteFrecuente::reservas).reversed())
                 .toList();
         return new ReporteClientesFrecuentes(items);
     }
@@ -115,8 +115,8 @@ public class ConsultarReportesService implements ConsultarReportesUseCase {
     @Override
     public ReporteDisponibilidad disponibilidad() {
         List<Herramienta> herramientas = herramientaRepositoryPort.listar();
-        List<ReporteDisponibilidad.Item> items = herramientas.stream()
-                .map(h -> new ReporteDisponibilidad.Item(
+        List<ReporteDisponibilidad.HerramientaDisponibilidad> items = herramientas.stream()
+                .map(h -> new ReporteDisponibilidad.HerramientaDisponibilidad(
                         h.getId(),
                         h.getNombre(),
                         h.getEstado(),
@@ -145,7 +145,7 @@ public class ConsultarReportesService implements ConsultarReportesUseCase {
                 ));
         Map<Long, Usuario> usuarios = usuariosPorId();
 
-        List<ReporteRentabilidad.Item> items = herramientaRepositoryPort.listar().stream()
+        List<ReporteRentabilidad.HerramientaRentabilidad> items = herramientaRepositoryPort.listar().stream()
                 .map(herramienta -> {
                     List<Reserva> pagadas = reservasPagadas.getOrDefault(herramienta.getId(), List.of());
                     BigDecimal ingreso = pagadas.stream()
@@ -154,7 +154,7 @@ public class ConsultarReportesService implements ConsultarReportesUseCase {
                     BigDecimal costo = costos.getOrDefault(herramienta.getId(), BigDecimal.ZERO);
                     BigDecimal utilidad = ingreso.subtract(costo);
                     Usuario proveedor = usuarios.get(herramienta.getProveedorId());
-                    return new ReporteRentabilidad.Item(
+                    return new ReporteRentabilidad.HerramientaRentabilidad(
                             herramienta.getId(),
                             herramienta.getNombre(),
                             herramienta.getProveedorId(),
@@ -166,11 +166,11 @@ public class ConsultarReportesService implements ConsultarReportesUseCase {
                             margen(utilidad, ingreso)
                     );
                 })
-                .sorted(Comparator.comparing(ReporteRentabilidad.Item::utilidad).reversed())
+                .sorted(Comparator.comparing(ReporteRentabilidad.HerramientaRentabilidad::utilidad).reversed())
                 .toList();
 
-        BigDecimal ingresosTotales = items.stream().map(ReporteRentabilidad.Item::ingresos).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal costoTotal = items.stream().map(ReporteRentabilidad.Item::costoMantenimiento).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal ingresosTotales = items.stream().map(ReporteRentabilidad.HerramientaRentabilidad::ingresos).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal costoTotal = items.stream().map(ReporteRentabilidad.HerramientaRentabilidad::costoMantenimiento).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal utilidadTotal = ingresosTotales.subtract(costoTotal);
         return new ReporteRentabilidad(ingresosTotales, costoTotal, utilidadTotal, margen(utilidadTotal, ingresosTotales), items);
     }
@@ -182,7 +182,7 @@ public class ConsultarReportesService implements ConsultarReportesUseCase {
                 .collect(Collectors.toMap(Herramienta::getId, Function.identity()));
         Map<Long, Usuario> usuarios = usuariosPorId();
 
-        List<ReporteIncidencias.Item> items = reservas.stream()
+        List<ReporteIncidencias.Incidencia> items = reservas.stream()
                 .map(reserva -> {
                     Herramienta herramienta = herramientas.get(reserva.getHerramientaId());
                     Usuario cliente = usuarios.get(reserva.getClienteId());
@@ -190,7 +190,7 @@ public class ConsultarReportesService implements ConsultarReportesUseCase {
                     Mantenimiento mantenimiento = mantenimientoRepositoryPort.listarPorReserva(reserva.getId()).stream()
                             .max(Comparator.comparing(Mantenimiento::getFechaInicio))
                             .orElse(null);
-                    return new ReporteIncidencias.Item(
+                    return new ReporteIncidencias.Incidencia(
                             reserva.getId(),
                             reserva.getHerramientaId(),
                             herramienta == null ? null : herramienta.getNombre(),
@@ -206,7 +206,7 @@ public class ConsultarReportesService implements ConsultarReportesUseCase {
                             mantenimiento == null ? null : mantenimiento.getCostoReparacion()
                     );
                 })
-                .sorted(Comparator.comparing(ReporteIncidencias.Item::fechaDevolucion,
+                .sorted(Comparator.comparing(ReporteIncidencias.Incidencia::fechaDevolucion,
                         Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
 

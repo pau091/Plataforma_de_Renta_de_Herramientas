@@ -28,6 +28,15 @@ spring:
       max-file-size: 5MB
       max-request-size: 6MB
 
+springdoc:
+  # Las respuestas de la API son JSON (Swagger mostraría */* si no se indica).
+  default-produces-media-type: application/json
+  swagger-ui:
+    # Conserva el token de "Authorize" al recargar la página y ordena por ruta dentro de cada etiqueta.
+    persist-authorization: true
+    operations-sorter: alpha
+    doc-expansion: none
+
 jwt:
   secret: ${JWT_SECRET:ClaveSecretaSuperSeguraParaProyectoDeRentaDeHerramientas2026AcademicSecureKey}
   expiration-ms: 86400000

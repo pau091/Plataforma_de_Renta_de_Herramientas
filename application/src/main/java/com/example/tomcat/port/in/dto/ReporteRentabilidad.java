@@ -12,9 +12,9 @@ public record ReporteRentabilidad(
         BigDecimal costoMantenimientoTotal,
         BigDecimal utilidadTotal,
         BigDecimal margenPorcentaje,
-        List<Item> items
+        List<HerramientaRentabilidad> items
 ) {
-    public record Item(
+    public record HerramientaRentabilidad(
             Long herramientaId,
             String nombre,
             Long proveedorId,

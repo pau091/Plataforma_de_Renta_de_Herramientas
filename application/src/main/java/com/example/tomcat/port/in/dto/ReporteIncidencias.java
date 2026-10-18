@@ -7,8 +7,8 @@ import java.util.List;
 /**
  * Devoluciones con incidencia (equipo DANADO o PERDIDO) y el mantenimiento que generaron, si lo hay.
  */
-public record ReporteIncidencias(long total, long danadas, long perdidas, List<Item> items) {
-    public record Item(
+public record ReporteIncidencias(long total, long danadas, long perdidas, List<Incidencia> items) {
+    public record Incidencia(
             Long reservaId,
             Long herramientaId,
             String herramientaNombre,
