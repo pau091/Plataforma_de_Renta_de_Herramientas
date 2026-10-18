@@ -22,3 +22,6 @@ tomas.maestro@gmail.com	mariana.interiores@gmail.com	andres.electricista@gmail.c
 catalina.paisajismo@gmail.com	esteban.plomeria@gmail.com	daniel.acabados@gmail.com
 sara.ingenieria@gmail.com	gabriel.mantenimiento@gmail.com ⚠️	
 ⚠️ gabriel.mantenimiento@gmail.com está desactivada a propósito: al intentar entrar, la página muestra "usuario inactivo". Sirve para demostrar esa regla.
+
+
+CONTRASEÑA: Rentas2026*
