@@ -58,6 +58,17 @@ public class ControlAcceso {
         throw new AccesoDenegadoException("Solo el proveedor dueño de la herramienta puede gestionar esta reserva.");
     }
 
+    /** Modificar o cancelar una reserva: solo el cliente que la hizo o un admin. */
+    public void verificarTitularReserva(Solicitante solicitante, Reserva reserva) {
+        if (solicitante.esAdmin()) {
+            return;
+        }
+        if (solicitante.esCliente() && solicitante.esUsuario(reserva.getClienteId())) {
+            return;
+        }
+        throw new AccesoDenegadoException("Solo el cliente que hizo la reserva puede modificarla o cancelarla.");
+    }
+
     public void verificarAccesoFactura(Solicitante solicitante, Factura factura) {
         if (solicitante.esAdmin()) {
             return;

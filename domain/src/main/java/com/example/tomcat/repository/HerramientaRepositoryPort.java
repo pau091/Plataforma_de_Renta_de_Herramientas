@@ -10,6 +10,8 @@ public interface HerramientaRepositoryPort {
     List<Herramienta> listar();
     List<Herramienta> listarDisponibles();
     List<Herramienta> listarPorProveedor(Long proveedorId);
+    /** Búsqueda del catálogo: cada filtro es opcional (null = sin filtrar); texto busca en nombre y descripción. */
+    List<Herramienta> buscar(Long categoriaId, Long proveedorId, String estado, String texto);
     Optional<Herramienta> buscarPorId(Long id);
     boolean existePorCategoria(Long categoriaId);
     void eliminar(Long id);

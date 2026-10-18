@@ -13,6 +13,7 @@ public interface SpringDataReservaRepository extends JpaRepository<ReservaEntity
     List<ReservaEntity> findByClienteId(Long clienteId);
     List<ReservaEntity> findByHerramientaId(Long herramientaId);
     List<ReservaEntity> findByEstadoIn(Collection<String> estados);
+    List<ReservaEntity> findByEstadoDevolucionIn(Collection<String> estadosDevolucion);
 
     @Query("SELECT r FROM ReservaEntity r WHERE r.herramientaId IN :herramientaIds")
     List<ReservaEntity> findByHerramientaIdIn(@Param("herramientaIds") List<Long> herramientaIds);

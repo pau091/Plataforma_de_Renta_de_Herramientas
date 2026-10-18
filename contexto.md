@@ -94,10 +94,11 @@ docker compose down -v              # apagar y BORRAR datos (vuelve a los datos 
 | Rol | Usuarios |
 |---|---|
 | ADMIN | id 1: `admin@rentas.com` |
-| PROVEEDOR | ids 2 a 11. Ejemplos: `carlos.proveedor@gmail.com` (2, herramientas 1 y 2), `maria.equipos@gmail.com` (3, herramientas 3 y 4), `luis.equipos@gmail.com` (4, herramientas 5 y 6), `sofia.maquinaria@gmail.com` (5, herramientas 7 y 8), `andres.rentals@gmail.com` (6, herramientas 9 y 10), `elena.maqpro@gmail.com` (11, herramientas 19 y 20) |
-| CLIENTE | ids 12 a 21. Ejemplos: `juan.cliente@gmail.com` (12), `ana.rentas@gmail.com` (13) |
+| PROVEEDOR | ids 2 a 11 y 22 a 31 (cada nuevo tiene 1 herramienta: la 21 a la 30). Ejemplos: `carlos.proveedor@gmail.com` (2, herramientas 1 y 2), `maria.equipos@gmail.com` (3, herramientas 3 y 4), `luis.equipos@gmail.com` (4, herramientas 5 y 6), `sofia.maquinaria@gmail.com` (5, herramientas 7 y 8), `andres.rentals@gmail.com` (6, herramientas 9 y 10), `elena.maqpro@gmail.com` (11, herramientas 19 y 20) |
+| CLIENTE | ids 12 a 21 y 32 a 41. Ejemplos: `juan.cliente@gmail.com` (12, el cliente más frecuente), `ana.rentas@gmail.com` (13), `felipe.remodelaciones@gmail.com` (32). `gabriel.mantenimiento@gmail.com` (41) está **inactivo a propósito** (demo de login 403) |
 
-  Cada proveedor tiene 2 herramientas consecutivas: el proveedor *n* tiene las herramientas 2(*n*−2)+1 y 2(*n*−2)+2.
+  Cada proveedor del 2 al 11 tiene 2 herramientas consecutivas: el proveedor *n* tiene las herramientas 2(*n*−2)+1 y 2(*n*−2)+2.
+  La herramienta 22 está FUERA_DE_SERVICIO (perdida) y la 23 en MANTENIMIENTO (daño con mantenimiento abierto).
 
 **Ejecutar la app sin Docker**, contra cualquier MySQL:
 ```bash
@@ -134,12 +135,13 @@ Paquete base: `com.example.tomcat`.
   - autenticación y usuarios: `AutenticarUsuario`, `RegistrarUsuario`, `GestionarUsuario`;
   - catálogo: `GestionarHerramienta`, `GestionarCategoria`, `ConsultarDisponibilidad`;
   - reservas: `CrearReserva`, `GestionarReserva`, `VencerReservas`;
-  - pagos y facturas: `ProcesarPago`, `ListarPagos`, `GestionarFactura`;
+  - pagos y facturas: `ProcesarPago`, `ListarPagos`, `GestionarPago` (corregir método y reembolsar, solo ADMIN), `GestionarFactura`;
   - otros: `GestionarMantenimiento`, `ConsultarReportes`, `ConsultarPanel`.
 - `port/in/dto/`:
   - `Solicitante(id, rol)`: el usuario autenticado. Lo arma la infraestructura desde el JWT.
   - `Panel`: interfaz sellada con `Panel.Cliente`, `Panel.Proveedor` y `Panel.Admin`.
-  - `Reporte*`: los cuatro DTOs de reportes.
+  - `Reporte*`: los seis DTOs de reportes (ingresos, más alquiladas, clientes frecuentes, disponibilidad,
+    rentabilidad e incidencias).
 - `port/out/`: `PasswordHasherPort` (BCrypt) y `AlmacenamientoImagenPort` (disco local).
 - `service/`: implementaciones, más tres clases de apoyo:
   - `ControlAcceso`: reglas de propiedad por rol.
@@ -209,8 +211,14 @@ PENDIENTE --(proveedor acepta)--> ACEPTADA --(cliente paga = confirmación autom
    |                                  |                                                    |
    +--(proveedor rechaza)--> RECHAZADA |                                         (proveedor entrega)
    +--(vence)--> VENCIDA <--(vence)----+                                                    v
-                                                    FINALIZADA <--(devolución)-- ENTREGADA
+   +--(cliente cancela)--> CANCELADA <-+                FINALIZADA <--(devolución)-- ENTREGADA
+                              ^
+                              +--(ADMIN reembolsa el pago)-- CONFIRMADA
 ```
+- **Modificar (`PUT /reservas/{id}`):** solo el cliente dueño o el ADMIN, solo en PENDIENTE. Mismas validaciones de
+  fechas que al crear (`Reserva.validarFechas`) y de cruce de fechas. No reinicia el plazo de 1 hora.
+- **Cancelar (`DELETE /reservas/{id}`):** solo el cliente dueño o el ADMIN, en PENDIENTE o ACEPTADA sin pagar. No se borra:
+  queda CANCELADA (libera las fechas). Una CONFIRMADA no se cancela así (400): el ADMIN debe reembolsar el pago.
 - **Al crear:** se valida que la herramienta esté DISPONIBLE, que la fecha de inicio no sea pasada (según
   `app.zona-horaria`) y que no se cruce con otras fechas. Se cruzan las reservas en estado PENDIENTE,
   ACEPTADA, CONFIRMADA o ENTREGADA.
@@ -228,6 +236,10 @@ PENDIENTE --(proveedor acepta)--> ACEPTADA --(cliente paga = confirmación autom
   - Métodos: TARJETA, TRANSFERENCIA o EFECTIVO.
   - Una reserva solo admite un pago COMPLETADO.
   - El pago, la factura (`FAC-%06d` con el id del pago) y el paso a CONFIRMADA ocurren en **una sola transacción**.
+  - **Corregir (`PUT /pagos/{id}`, solo ADMIN):** solo cambia el método (el monto lo fija la tarifa); también en la factura.
+  - **Reembolsar (`DELETE /pagos/{id}`, solo ADMIN):** solo pagos COMPLETADO de reservas CONFIRMADA (si ya se entregó → 409).
+    En una transacción: pago REEMBOLSADO (deja de contar como ingreso), reserva CANCELADA y factura ANULADA
+    (se conserva; el HTML descargable muestra "FACTURA ANULADA").
 - **Entrega:** solo si la reserva está CONFIRMADA.
 - **Devolución:** el estado del equipo puede ser BUENO, DANADO (también acepta "DAÑADO") o PERDIDO.
   - DANADO: la herramienta pasa a MANTENIMIENTO y se crea un mantenimiento ligado a la reserva.
@@ -267,12 +279,12 @@ PENDIENTE --(proveedor acepta)--> ACEPTADA --(cliente paga = confirmación autom
 | Auth | `POST /auth/registro` (solo crea CLIENTE, 201), `POST /auth/login` → `{token, usuarioId, nombre, email, rol}` | Público |
 | Usuarios | `POST /usuarios` (crea PROVEEDOR o CLIENTE), `GET /usuarios[?rol=]`, `GET /usuarios/clientes`, `GET /usuarios/proveedores`, `GET/PUT/DELETE /usuarios/{id}` | ADMIN |
 | Categorías | `GET /categorias`, `GET /categorias/{id}` (cualquier rol). `POST`, `PUT /{id}`, `DELETE /{id}` (ADMIN) | Mixto |
-| Herramientas | `GET /herramientas[?disponibles=true][&proveedorId=]`, `GET /herramientas/mias`, `GET /{id}` (cualquier rol). `POST`, `PUT /{id}`, `PATCH /{id}/estado`, `PATCH /{id}/imagen` (URL), `POST /{id}/imagen` (archivo), `DELETE /{id}` (ADMIN o el proveedor dueño) | Mixto |
-| Reservas | `POST /reservas` (CLIENTE o ADMIN), `GET /reservas[?clienteId&proveedorId&herramientaId]` (filtradas según el rol), `GET /{id}`, `POST /{id}/aceptar`, `/rechazar`, `/entregar`, `/devolver` (proveedor dueño o ADMIN), `POST /reservas/vencer` (ADMIN), `GET /reservas/disponibilidad?fechaInicio&fechaFin`, `GET /reservas/disponibilidad/{herramientaId}?fechaInicio&fechaFin` | Mixto |
-| Pagos | `POST /pagos` (CLIENTE dueño o ADMIN; 201), `GET /pagos[?reservaId]`, `GET /pagos/reserva/{id}`, `GET /pagos/{id}` (filtrados según el rol) | Mixto |
+| Herramientas | `GET /herramientas[?categoriaId][&disponibles=true][&proveedorId][&q=texto]` (filtros combinables, consulta en BD; categoría inexistente → 404), `GET /herramientas/mias`, `GET /{id}` (cualquier rol). `POST`, `PUT /{id}`, `PATCH /{id}/estado`, `PATCH /{id}/imagen` (URL), `POST /{id}/imagen` (archivo), `DELETE /{id}` (ADMIN o el proveedor dueño) | Mixto |
+| Reservas | `POST /reservas` (CLIENTE o ADMIN), `GET /reservas[?clienteId&proveedorId&herramientaId&estado]` (filtradas según el rol), `GET /{id}`, `PUT /{id}` (cambiar fechas) y `DELETE /{id}` (cancelar) (cliente dueño o ADMIN), `POST /{id}/aceptar`, `/rechazar`, `/entregar`, `/devolver` (proveedor dueño o ADMIN), `POST /reservas/vencer` (ADMIN), `GET /reservas/disponibilidad?fechaInicio&fechaFin`, `GET /reservas/disponibilidad/{herramientaId}?fechaInicio&fechaFin` | Mixto |
+| Pagos | `POST /pagos` (CLIENTE dueño o ADMIN; 201), `GET /pagos[?reservaId]`, `GET /pagos/reserva/{id}`, `GET /pagos/{id}` (filtrados según el rol), `PUT /pagos/{id}` (corregir método) y `DELETE /pagos/{id}` (reembolso) (solo ADMIN) | Mixto |
 | Facturas | `GET /facturas[?clienteId]`, `GET /{id}`, `GET /pago/{pagoId}`, `GET /reserva/{reservaId}`, `GET /{id}/descargar` (HTML adjunto) | Según el rol |
 | Mantenimientos | `GET /mantenimientos[?herramientaId|reservaId]`, `POST /mantenimientos` (201), `POST /{id}/cerrar` | ADMIN o PROVEEDOR (los suyos) |
-| Reportes | `GET /reportes/ingresos`, `/herramientas-mas-alquiladas`, `/clientes-frecuentes`, `/disponibilidad` | ADMIN |
+| Reportes | `GET /reportes/ingresos`, `/herramientas-mas-alquiladas`, `/clientes-frecuentes`, `/disponibilidad`, `/rentabilidad` (ingresos − costo de mantenimientos, por herramienta y global, con margen %), `/incidencias` (devoluciones DANADO/PERDIDO con su mantenimiento) | ADMIN |
 | Panel | `GET /panel`: `Panel.Cliente` (reservas por estado, próximas, total pagado, facturas), `Panel.Proveedor` (inventario, solicitudes pendientes, ingresos, mantenimientos abiertos) o `Panel.Admin` (totales globales) | Cualquier rol autenticado |
 
 **Códigos HTTP:**
@@ -291,7 +303,9 @@ PENDIENTE --(proveedor acepta)--> ACEPTADA --(cliente paga = confirmación autom
 ## 8. Base de datos y migraciones (Flyway, `infraestructura/src/main/resources/db/migration/`)
 
 `spring.jpa.hibernate.ddl-auto=validate`: el esquema lo define **solo Flyway**.
-**Nunca modifiques una migración ya aplicada**; crea una nueva. **La siguiente versión libre es V9.**
+**Nunca modifiques una migración ya aplicada**; crea una nueva. **La siguiente versión libre es V12.**
+Al agregar una migración, sube también `spring.flyway.baseline-version` en `application.yml` y regenera
+`sql/schema.sql` / `sql/data.sql` si cambian el esquema o los datos.
 
 | Versión | Contenido |
 |---|---|
@@ -303,14 +317,28 @@ PENDIENTE --(proveedor acepta)--> ACEPTADA --(cliente paga = confirmación autom
 | V6 | Datos de prueba: 20 mantenimientos y 20 facturas generadas desde los pagos |
 | V7 | Las FKs pasan de `ON DELETE CASCADE` a `RESTRICT`, para conservar historial. `usuario_roles` mantiene CASCADE y `mantenimientos.reserva_id` mantiene SET NULL |
 | V8 | `reservas.fecha_aceptacion`; las reservas ACEPTADA con pago pasan a CONFIRMADA; índice `idx_reservas_estado` |
+| V9 | `facturas.estado` (VIGENTE/ANULADA) e índice `idx_reservas_estado_devolucion`. Estados nuevos sin cambio de esquema: reserva CANCELADA y pago REEMBOLSADO |
+| V10 | Índice compuesto `idx_reservas_herramienta_fechas` (reemplaza a `idx_reservas_herramienta_id`), `idx_herramientas_estado`, `uk_categorias_nombre` y 10 restricciones `CHECK` (estados, montos, tarifa, fechas) |
+| V11 | Datos de demostración coherentes (ver abajo). Usa `UPDATE` sobre las filas de V2/V6 e `INSERT` con variables `@reserva_N` |
 
-**Problemas conocidos de los datos de prueba** (se corrigen en la Fase 4 con una migración V9):
-- Hay pagos COMPLETADO para reservas PENDIENTE (2, 6, 10, 12, 16, 19) y RECHAZADA (8). Esos pagos falsos evitan
-  hoy que las reservas PENDIENTE venzan.
-- Algunos montos no cuadran con `tarifa × días` (por ejemplo, la reserva 2: 120000 × 8 = 960000, pero el pago es de 840000).
-- Las reservas FINALIZADA no tienen `fecha_entrega` ni `fecha_devolucion`.
-- **Ojo:** al quitar los pagos falsos, las reservas PENDIENTE de los datos de prueba vencerán 1 hora después de crear
-  la base (por la regla del plazo). Pregunta al usuario cómo quiere los datos de demostración.
+**Datos de demostración (V11, igual a `sql/data.sql`):**
+- 3 roles, 41 usuarios (1 admin, 20 proveedores, 20 clientes), 20 categorías, 30 herramientas, 34 reservas,
+  24 pagos (23 COMPLETADO + 1 REEMBOLSADO), 24 facturas (1 ANULADA) y 21 mantenimientos (1 abierto).
+- Reservas en los 8 estados. Montos = tarifa × días. Las FINALIZADA tienen entrega, devolución y estado
+  del equipo (3 DANADO con mantenimiento, 1 PERDIDO).
+- **Fechas relativas al día en que se crea la base** (`CURDATE() ± n`), así la demo es coherente cuando sea que se ejecute.
+- **Decisión (basada en `explicacion.md`, que exige "vencimiento de reservas" y no fija el plazo):** se mantiene el plazo
+  de 1 hora pedido por el usuario. Las 3 PENDIENTE y 2 ACEPTADA de la demo vencen 1 hora después de crear la base, lo que
+  demuestra el vencimiento automático. Para demostrar aceptar/rechazar/pagar se crea una reserva nueva (documentarlo en
+  el README).
+- Fuente única: `sql/data.sql` y V11 se generaron con el mismo script (fuera del repo). Se verificó que Flyway
+  (V1–V11) y `schema.sql` + `data.sql` producen **el mismo esquema y los mismos datos**.
+
+**Scripts SQL (`sql/`) y diagrama (`docs/`):**
+- `sql/schema.sql`: esquema final completo y comentado. `sql/data.sql`: población.
+- Si la app arranca sobre una base creada con esos scripts, Flyway la registra como versión 11
+  (`spring.flyway.baseline-version: 11`) y no reaplica migraciones (verificado).
+- `docs/diagrama-er.mmd` (fuente Mermaid) y `docs/diagrama-er.png` (imagen, exportada con Edge headless).
 
 **Cómo se prueba sin ensuciar la base del usuario:**
 ```bash
@@ -334,20 +362,12 @@ Para probar los plazos sin esperar, se adelanta el tiempo en la base temporal, p
 | Extra: eliminar código y archivos sin uso | ✅ | `132b818` |
 | 2. Robustez: transacciones, 404/409/500, Bean Validation, V7, no perder historial | ✅ (36 pruebas OK) | `7b2040d` (lo hizo el usuario) |
 | 3. Funcionalidades: CRUD de categorías, subida de imágenes, vencimiento, panel; ajuste de confirmación automática y plazo de 1 h (V8) | ✅ (42 + 28 pruebas OK) | `3ba6c04`, `60eaaea` (los hizo el usuario) |
-| **4. Base de datos** | ⏳ **Siguiente** | — |
-| 5. Documentación de la API: Swagger (`@Operation`, `@Tag`, ejemplos JSON) y colección de Postman | Pendiente | — |
+| 3.5 Brechas frente al enunciado: CRUD de reservas (PUT/DELETE) y pagos (PUT/DELETE = reembolso), búsqueda por categoría, reportes de rentabilidad e incidencias (V9) | ✅ (71 pruebas HTTP OK) | pendiente (lo hace el usuario) |
+| 4. Base de datos: V10 (índices y CHECK), V11 (datos coherentes), `sql/schema.sql`, `sql/data.sql`, diagrama ER | ✅ (56 pruebas de datos/HTTP + comparación Flyway vs scripts + 71 de regresión) | pendiente (lo hace el usuario) |
+| **5. Documentación de la API: Swagger (`@Operation`, `@Tag`, ejemplos JSON) y colección de Postman** | ⏳ **Siguiente** | — |
 | 6. Frontend por rol | Pendiente | — |
 | 7. Pruebas automatizadas | Pendiente | — |
 | 8. Cierre: README y verificación final | Pendiente | — |
-
-**Fase 4, qué falta:**
-- V9 que corrija los datos de prueba (ver la sección 8): pagos coherentes con el estado, montos = tarifa × días,
-  fechas de entrega y devolución en las reservas FINALIZADA, y algunas reservas en estados variados (CONFIRMADA, ENTREGADA, VENCIDA).
-- Al menos 20 registros por entidad, que el enunciado exige.
-- `sql/schema.sql`: hoy solo tiene `CREATE DATABASE`. Debe quedar como el esquema completo equivalente a V1–V8.
-- `sql/data.sql` con los datos.
-- Diagrama relacional en imagen (por ejemplo `docs/diagrama-er.png`).
-- Revisar índices.
 
 **Fase 6, qué falta:** hoy `infraestructura/src/main/resources/static/index.html` + `app.js` es mínimo:
 - Hay login, catálogo y un formulario de alta de herramienta.

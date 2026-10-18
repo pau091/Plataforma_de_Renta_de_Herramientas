@@ -35,6 +35,12 @@ public class HerramientaRepositoryAdapter implements HerramientaRepositoryPort {
     }
 
     @Override
+    public List<Herramienta> buscar(Long categoriaId, Long proveedorId, String estado, String texto) {
+        String textoNormalizado = texto == null || texto.isBlank() ? null : texto.trim().toLowerCase();
+        return repository.buscar(categoriaId, proveedorId, estado, textoNormalizado).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     public List<Herramienta> listarDisponibles() {
         return repository.findByEstado("DISPONIBLE").stream().map(mapper::toDomain).toList();
     }

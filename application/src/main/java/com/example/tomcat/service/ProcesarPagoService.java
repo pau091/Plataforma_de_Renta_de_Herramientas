@@ -20,11 +20,8 @@ import com.example.tomcat.valueobject.Dinero;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Set;
 
 public class ProcesarPagoService implements ProcesarPagoUseCase {
-
-    private static final Set<String> METODOS = Set.of("TARJETA", "TRANSFERENCIA", "EFECTIVO");
 
     private final PagoRepositoryPort pagoRepositoryPort;
     private final ReservaRepositoryPort reservaRepositoryPort;
@@ -78,10 +75,7 @@ public class ProcesarPagoService implements ProcesarPagoUseCase {
             throw new DomainException("El monto del pago debe ser " + esperado + " según tarifa y días de alquiler.");
         }
 
-        String metodo = metodoPago == null ? "" : metodoPago.trim().toUpperCase();
-        if (!METODOS.contains(metodo)) {
-            throw new DomainException("Método de pago no válido. Use TARJETA, TRANSFERENCIA o EFECTIVO.");
-        }
+        String metodo = Pago.normalizarMetodo(metodoPago);
 
         Pago pago = pagoRepositoryPort.guardar(new Pago(null, reservaId, dinero.getMonto(), metodo, "COMPLETADO", null));
         reservaRepositoryPort.guardar(reserva);
@@ -102,7 +96,8 @@ public class ProcesarPagoService implements ProcesarPagoUseCase {
                 esperado,
                 esperado,
                 metodo,
-                LocalDateTime.now()
+                LocalDateTime.now(),
+                "VIGENTE"
         ));
         return pago;
     }

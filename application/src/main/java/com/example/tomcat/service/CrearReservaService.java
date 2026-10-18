@@ -46,15 +46,7 @@ public class CrearReservaService implements CrearReservaUseCase {
             throw new DomainException("La herramienta no se encuentra disponible para renta.");
         }
 
-        if (fechaInicio == null || fechaFin == null) {
-            throw new DomainException("Las fechas de la reserva son obligatorias.");
-        }
-        if (fechaInicio.isAfter(fechaFin)) {
-            throw new DomainException("La fecha de inicio no puede ser posterior a la fecha fin.");
-        }
-        if (fechaInicio.isBefore(politica.hoy())) {
-            throw new DomainException("No se puede reservar con una fecha de inicio pasada.");
-        }
+        Reserva.validarFechas(fechaInicio, fechaFin, politica.hoy());
         if (reservaRepositoryPort.existeSolape(herramientaId, fechaInicio, fechaFin, null)) {
             throw new ConflictoException("La herramienta ya tiene una reserva en esas fechas.");
         }

@@ -22,8 +22,11 @@ public interface GestionarHerramientaUseCase {
     Herramienta subirImagen(Solicitante solicitante, Long id, byte[] contenido);
 
     // Consultas del catálogo: abiertas a cualquier usuario autenticado.
-    List<Herramienta> listar();
-    List<Herramienta> listarDisponibles();
     List<Herramienta> listarPorProveedor(Long proveedorId);
+    /**
+     * Búsqueda del catálogo por categoría, proveedor, disponibilidad y texto (nombre o descripción).
+     * Todos los filtros son opcionales y se combinan entre sí.
+     */
+    List<Herramienta> buscar(Long categoriaId, Long proveedorId, boolean soloDisponibles, String texto);
     Herramienta buscarPorId(Long id);
 }

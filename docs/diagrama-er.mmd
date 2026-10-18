@@ -1,0 +1,100 @@
+%% Diagrama relacional de renta_herramientas_db (esquema final: sql/schema.sql = migraciones V1-V11).
+%% Imagen generada: docs/diagrama-er.png
+erDiagram
+    ROLES ||--o{ USUARIO_ROLES : "se asigna en"
+    USUARIOS ||--o{ USUARIO_ROLES : "tiene"
+    USUARIOS ||--o{ HERRAMIENTAS : "publica (proveedor)"
+    CATEGORIAS |o--o{ HERRAMIENTAS : "clasifica"
+    USUARIOS ||--o{ RESERVAS : "solicita (cliente)"
+    HERRAMIENTAS ||--o{ RESERVAS : "se alquila en"
+    RESERVAS ||--o{ PAGOS : "se paga con"
+    PAGOS ||--|| FACTURAS : "genera"
+    RESERVAS ||--o{ FACTURAS : "se factura en"
+    USUARIOS ||--o{ FACTURAS : "recibe (cliente)"
+    HERRAMIENTAS ||--o{ FACTURAS : "se factura en"
+    HERRAMIENTAS ||--o{ MANTENIMIENTOS : "recibe"
+    RESERVAS |o--o{ MANTENIMIENTOS : "daño reportado en"
+
+    ROLES {
+        bigint id PK
+        varchar nombre UK "ADMIN, PROVEEDOR, CLIENTE"
+    }
+    USUARIOS {
+        bigint id PK
+        varchar nombre
+        varchar email UK
+        varchar password "BCrypt"
+        boolean activo
+        timestamp created_at
+    }
+    USUARIO_ROLES {
+        bigint usuario_id PK, FK
+        bigint rol_id PK, FK
+    }
+    CATEGORIAS {
+        bigint id PK
+        varchar nombre UK
+        text descripcion
+    }
+    HERRAMIENTAS {
+        bigint id PK
+        bigint proveedor_id FK
+        bigint categoria_id FK
+        varchar nombre
+        text descripcion
+        decimal tarifa_diaria "mayor que 0"
+        varchar estado "DISPONIBLE, MANTENIMIENTO, FUERA_DE_SERVICIO"
+        varchar imagen_url
+        timestamp created_at
+    }
+    RESERVAS {
+        bigint id PK
+        bigint cliente_id FK
+        bigint herramienta_id FK
+        date fecha_inicio
+        date fecha_fin
+        varchar estado "PENDIENTE ... FINALIZADA, CANCELADA"
+        timestamp created_at
+        timestamp fecha_aceptacion
+        timestamp fecha_entrega
+        timestamp fecha_devolucion
+        varchar estado_devolucion "BUENO, DANADO, PERDIDO"
+        text observaciones_devolucion
+    }
+    PAGOS {
+        bigint id PK
+        bigint reserva_id FK
+        decimal monto "tarifa x dias"
+        varchar metodo_pago "TARJETA, TRANSFERENCIA, EFECTIVO"
+        varchar estado_pago "COMPLETADO, REEMBOLSADO..."
+        timestamp fecha_pago
+    }
+    FACTURAS {
+        bigint id PK
+        varchar numero UK "FAC-000001"
+        bigint pago_id FK, UK
+        bigint reserva_id FK
+        bigint cliente_id FK
+        varchar cliente_nombre "copia al facturar"
+        varchar cliente_email
+        bigint herramienta_id FK
+        varchar herramienta_nombre
+        date fecha_inicio
+        date fecha_fin
+        int dias
+        decimal tarifa_diaria
+        decimal subtotal
+        decimal total
+        varchar metodo_pago
+        varchar estado "VIGENTE, ANULADA"
+        timestamp fecha_emision
+    }
+    MANTENIMIENTOS {
+        bigint id PK
+        bigint herramienta_id FK
+        bigint reserva_id FK "opcional"
+        text descripcion_problema
+        decimal costo_reparacion
+        timestamp fecha_inicio
+        timestamp fecha_fin "NULL = abierto"
+    }

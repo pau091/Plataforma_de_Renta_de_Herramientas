@@ -138,18 +138,17 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
     }
 
     @Override
-    public List<Herramienta> listar() {
-        return herramientaRepositoryPort.listar();
-    }
-
-    @Override
-    public List<Herramienta> listarDisponibles() {
-        return herramientaRepositoryPort.listarDisponibles();
-    }
-
-    @Override
     public List<Herramienta> listarPorProveedor(Long proveedorId) {
         return herramientaRepositoryPort.listarPorProveedor(proveedorId);
+    }
+
+    @Override
+    public List<Herramienta> buscar(Long categoriaId, Long proveedorId, boolean soloDisponibles, String texto) {
+        if (categoriaId != null) {
+            categoriaRepositoryPort.buscarPorId(categoriaId)
+                    .orElseThrow(() -> new RecursoNoEncontradoException("La categoría no existe."));
+        }
+        return herramientaRepositoryPort.buscar(categoriaId, proveedorId, soloDisponibles ? "DISPONIBLE" : null, texto);
     }
 
     @Override

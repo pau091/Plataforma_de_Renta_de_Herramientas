@@ -1,6 +1,7 @@
 package com.example.tomcat.adapter.in.rest;
 
 import com.example.tomcat.model.Pago;
+import com.example.tomcat.port.in.GestionarPagoUseCase;
 import com.example.tomcat.port.in.ListarPagosUseCase;
 import com.example.tomcat.port.in.ProcesarPagoUseCase;
 import com.example.tomcat.security.UsuarioAutenticado;
@@ -23,10 +24,13 @@ public class PagoController {
 
     private final ProcesarPagoUseCase procesarPagoUseCase;
     private final ListarPagosUseCase listarPagosUseCase;
+    private final GestionarPagoUseCase gestionarPagoUseCase;
 
-    public PagoController(ProcesarPagoUseCase procesarPagoUseCase, ListarPagosUseCase listarPagosUseCase) {
+    public PagoController(ProcesarPagoUseCase procesarPagoUseCase, ListarPagosUseCase listarPagosUseCase,
+                          GestionarPagoUseCase gestionarPagoUseCase) {
         this.procesarPagoUseCase = procesarPagoUseCase;
         this.listarPagosUseCase = listarPagosUseCase;
+        this.gestionarPagoUseCase = gestionarPagoUseCase;
     }
 
     @PostMapping
@@ -54,6 +58,28 @@ public class PagoController {
     public ResponseEntity<Pago> obtener(@AuthenticationPrincipal UsuarioAutenticado usuario, @PathVariable Long id) {
         return ResponseEntity.ok(listarPagosUseCase.buscarPorId(usuario.solicitante(), id));
     }
+
+    /** Solo ADMIN: corrige el método de pago registrado (y el de su factura). */
+    @PutMapping("/{id}")
+    public ResponseEntity<Pago> actualizar(@AuthenticationPrincipal UsuarioAutenticado usuario,
+                                           @PathVariable Long id,
+                                           @Valid @RequestBody ActualizarPagoRequest request) {
+        return ResponseEntity.ok(gestionarPagoUseCase.actualizarMetodo(usuario.solicitante(), id, request.metodoPago()));
+    }
+
+    /**
+     * Solo ADMIN: reembolsa el pago de una reserva aún no entregada. No se borra: el pago queda REEMBOLSADO,
+     * la reserva CANCELADA y la factura ANULADA.
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Pago> reembolsar(@AuthenticationPrincipal UsuarioAutenticado usuario, @PathVariable Long id) {
+        return ResponseEntity.ok(gestionarPagoUseCase.reembolsar(usuario.solicitante(), id));
+    }
+
+    public record ActualizarPagoRequest(
+            @NotBlank(message = "El método de pago es obligatorio (TARJETA, TRANSFERENCIA o EFECTIVO).")
+            String metodoPago
+    ) {}
 
     public record PagoRequest(
             @NotNull(message = "La reserva es obligatoria.")

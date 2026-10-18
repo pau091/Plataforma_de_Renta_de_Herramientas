@@ -12,6 +12,8 @@ import java.util.Set;
  * PENDIENTE --(proveedor acepta)--> ACEPTADA --(cliente paga: confirmación automática)--> CONFIRMADA
  * --(proveedor entrega)--> ENTREGADA --(devolución)--> FINALIZADA.
  * PENDIENTE puede pasar a RECHAZADA; PENDIENTE y ACEPTADA pueden pasar a VENCIDA si se agota el plazo.
+ * El cliente puede cancelar una reserva PENDIENTE o ACEPTADA (CANCELADA); una CONFIRMADA solo se cancela
+ * cuando el administrador reembolsa su pago antes de la entrega.
  */
 public class Reserva {
     private static final Set<String> ESTADOS_DEVOLUCION = Set.of("BUENO", "DANADO", "PERDIDO");
@@ -61,6 +63,44 @@ public class Reserva {
 
     public long diasAlquiler() {
         return ChronoUnit.DAYS.between(fechaInicio, fechaFin) + 1;
+    }
+
+    /** Reglas de fechas comunes al crear y al modificar una reserva. */
+    public static void validarFechas(LocalDate fechaInicio, LocalDate fechaFin, LocalDate hoy) {
+        if (fechaInicio == null || fechaFin == null) {
+            throw new DomainException("Las fechas de la reserva son obligatorias.");
+        }
+        if (fechaInicio.isAfter(fechaFin)) {
+            throw new DomainException("La fecha de inicio no puede ser posterior a la fecha fin.");
+        }
+        if (fechaInicio.isBefore(hoy)) {
+            throw new DomainException("No se puede reservar con una fecha de inicio pasada.");
+        }
+    }
+
+    /** El cliente solo puede cambiar las fechas mientras el proveedor no haya respondido. */
+    public void modificarFechas(LocalDate nuevaFechaInicio, LocalDate nuevaFechaFin, LocalDate hoy) {
+        exigirEstado("PENDIENTE", "Solo se pueden modificar las fechas de reservas pendientes.");
+        validarFechas(nuevaFechaInicio, nuevaFechaFin, hoy);
+        this.fechaInicio = nuevaFechaInicio;
+        this.fechaFin = nuevaFechaFin;
+    }
+
+    /** Cancelación por parte del cliente (o un admin) antes de pagar. Libera las fechas. */
+    public void cancelar() {
+        if ("CONFIRMADA".equals(estado)) {
+            throw new DomainException("La reserva ya está pagada: para cancelarla el administrador debe reembolsar el pago.");
+        }
+        if (!"PENDIENTE".equals(estado) && !"ACEPTADA".equals(estado)) {
+            throw new DomainException("Solo se pueden cancelar reservas pendientes o aceptadas sin pagar.");
+        }
+        this.estado = "CANCELADA";
+    }
+
+    /** Cancelación de una reserva pagada a causa del reembolso de su pago (antes de entregar la herramienta). */
+    public void cancelarPorReembolso() {
+        exigirEstado("CONFIRMADA", "Solo se puede reembolsar el pago de reservas confirmadas que aún no se han entregado.");
+        this.estado = "CANCELADA";
     }
 
     public void aceptar(LocalDateTime ahora) {

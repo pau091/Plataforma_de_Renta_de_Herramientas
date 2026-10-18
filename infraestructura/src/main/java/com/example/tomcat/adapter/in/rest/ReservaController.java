@@ -59,14 +59,34 @@ public class ReservaController {
             @AuthenticationPrincipal UsuarioAutenticado usuario,
             @RequestParam(required = false) Long clienteId,
             @RequestParam(required = false) Long proveedorId,
-            @RequestParam(required = false) Long herramientaId
+            @RequestParam(required = false) Long herramientaId,
+            @RequestParam(required = false) String estado
     ) {
-        return ResponseEntity.ok(gestionarReservaUseCase.listar(usuario.solicitante(), clienteId, proveedorId, herramientaId));
+        return ResponseEntity.ok(gestionarReservaUseCase.listar(
+                usuario.solicitante(), clienteId, proveedorId, herramientaId, estado));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Reserva> obtener(@AuthenticationPrincipal UsuarioAutenticado usuario, @PathVariable Long id) {
         return ResponseEntity.ok(gestionarReservaUseCase.buscarPorId(usuario.solicitante(), id));
+    }
+
+    /** Cambia las fechas de una reserva PENDIENTE (cliente que la hizo o ADMIN). */
+    @PutMapping("/{id}")
+    public ResponseEntity<Reserva> modificar(@AuthenticationPrincipal UsuarioAutenticado usuario,
+                                             @PathVariable Long id,
+                                             @Valid @RequestBody ModificarReservaRequest request) {
+        return ResponseEntity.ok(gestionarReservaUseCase.modificarFechas(
+                usuario.solicitante(), id, request.fechaInicio(), request.fechaFin()));
+    }
+
+    /**
+     * Cancela una reserva PENDIENTE o ACEPTADA sin pagar (cliente que la hizo o ADMIN).
+     * No se borra: queda CANCELADA en el historial y libera las fechas.
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Reserva> cancelar(@AuthenticationPrincipal UsuarioAutenticado usuario, @PathVariable Long id) {
+        return ResponseEntity.ok(gestionarReservaUseCase.cancelar(usuario.solicitante(), id));
     }
 
     @PostMapping("/{id}/aceptar")
@@ -125,6 +145,13 @@ public class ReservaController {
             @NotNull(message = "La herramienta es obligatoria.")
             Long herramientaId,
             // Que no sea pasada lo valida CrearReservaService con el reloj de app.zona-horaria.
+            @NotNull(message = "La fecha de inicio es obligatoria.")
+            LocalDate fechaInicio,
+            @NotNull(message = "La fecha fin es obligatoria.")
+            LocalDate fechaFin
+    ) {}
+
+    public record ModificarReservaRequest(
             @NotNull(message = "La fecha de inicio es obligatoria.")
             LocalDate fechaInicio,
             @NotNull(message = "La fecha fin es obligatoria.")

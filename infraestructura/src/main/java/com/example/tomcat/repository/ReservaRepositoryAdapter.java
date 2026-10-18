@@ -75,6 +75,11 @@ public class ReservaRepositoryAdapter implements ReservaRepositoryPort {
     }
 
     @Override
+    public List<Reserva> listarPorEstadosDevolucion(Collection<String> estadosDevolucion) {
+        return reservaRepository.findByEstadoDevolucionIn(estadosDevolucion).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     public boolean existeSolape(Long herramientaId, LocalDate fechaInicio, LocalDate fechaFin, Long reservaIdExcluida) {
         return reservaRepository.existsSolape(herramientaId, fechaInicio, fechaFin, reservaIdExcluida);
     }

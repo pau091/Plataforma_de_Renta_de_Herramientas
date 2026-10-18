@@ -9,6 +9,7 @@ import com.example.tomcat.port.in.GestionarCategoriaUseCase;
 import com.example.tomcat.port.in.GestionarFacturaUseCase;
 import com.example.tomcat.port.in.GestionarHerramientaUseCase;
 import com.example.tomcat.port.in.GestionarMantenimientoUseCase;
+import com.example.tomcat.port.in.GestionarPagoUseCase;
 import com.example.tomcat.port.in.GestionarReservaUseCase;
 import com.example.tomcat.port.in.GestionarUsuarioUseCase;
 import com.example.tomcat.port.in.ListarPagosUseCase;
@@ -34,6 +35,7 @@ import com.example.tomcat.service.GestionarCategoriaService;
 import com.example.tomcat.service.GestionarFacturaService;
 import com.example.tomcat.service.GestionarHerramientaService;
 import com.example.tomcat.service.GestionarMantenimientoService;
+import com.example.tomcat.service.GestionarPagoService;
 import com.example.tomcat.service.GestionarReservaService;
 import com.example.tomcat.service.GestionarUsuarioService;
 import com.example.tomcat.service.ListarPagosService;
@@ -214,6 +216,16 @@ public class BeanConfig {
     }
 
     @Bean
+    public GestionarPagoUseCase gestionarPagoUseCase(
+            PagoRepositoryPort pagoRepository,
+            ReservaRepositoryPort reservaRepository,
+            FacturaRepositoryPort facturaRepository
+    ) {
+        return TransaccionalProxy.envolver(GestionarPagoUseCase.class,
+                new GestionarPagoService(pagoRepository, reservaRepository, facturaRepository), tx, ESCRITURA);
+    }
+
+    @Bean
     public GestionarFacturaUseCase gestionarFacturaUseCase(FacturaRepositoryPort facturaRepository, ControlAcceso controlAcceso) {
         return TransaccionalProxy.envolver(GestionarFacturaUseCase.class,
                 new GestionarFacturaService(facturaRepository, controlAcceso), tx, LECTURA);
@@ -224,10 +236,12 @@ public class BeanConfig {
             PagoRepositoryPort pagoRepository,
             ReservaRepositoryPort reservaRepository,
             HerramientaRepositoryPort herramientaRepository,
-            UsuarioRepositoryPort usuarioRepository
+            UsuarioRepositoryPort usuarioRepository,
+            MantenimientoRepositoryPort mantenimientoRepository
     ) {
         return TransaccionalProxy.envolver(ConsultarReportesUseCase.class,
-                new ConsultarReportesService(pagoRepository, reservaRepository, herramientaRepository, usuarioRepository),
+                new ConsultarReportesService(pagoRepository, reservaRepository, herramientaRepository, usuarioRepository,
+                        mantenimientoRepository),
                 tx, LECTURA);
     }
 

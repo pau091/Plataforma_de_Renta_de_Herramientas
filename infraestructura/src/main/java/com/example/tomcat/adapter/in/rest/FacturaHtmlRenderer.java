@@ -26,11 +26,13 @@ public class FacturaHtmlRenderer {
                         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
                         th { background: #f4f4f4; }
                         .total { font-size: 1.2rem; font-weight: bold; }
+                        .anulada { color: #b00020; border: 2px solid #b00020; padding: 8px; display: inline-block; }
                     </style>
                 </head>
                 <body>
                     <h1>Comprobante de pago</h1>
                     <p class="muted">Plataforma de Renta de Herramientas</p>
+                    %s
                     <p><strong>Factura:</strong> %s<br>
                     <strong>Fecha de emisión:</strong> %s</p>
                     <h3>Cliente</h3>
@@ -55,6 +57,7 @@ public class FacturaHtmlRenderer {
                 </html>
                 """.formatted(
                 factura.getNumero(),
+                factura.estaAnulada() ? "<p class=\"anulada\"><strong>FACTURA ANULADA:</strong> el pago fue reembolsado.</p>" : "",
                 factura.getNumero(),
                 factura.getFechaEmision() == null ? "" : factura.getFechaEmision().format(FECHA_HORA),
                 factura.getClienteNombre(),

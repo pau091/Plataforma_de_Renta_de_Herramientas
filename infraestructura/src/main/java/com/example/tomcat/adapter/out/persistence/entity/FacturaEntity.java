@@ -61,6 +61,9 @@ public class FacturaEntity {
     @Column(name = "fecha_emision")
     private LocalDateTime fechaEmision = LocalDateTime.now();
 
+    @Column(nullable = false)
+    private String estado = "VIGENTE";
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getNumero() { return numero; }
@@ -95,4 +98,6 @@ public class FacturaEntity {
     public void setMetodoPago(String metodoPago) { this.metodoPago = metodoPago; }
     public LocalDateTime getFechaEmision() { return fechaEmision; }
     public void setFechaEmision(LocalDateTime fechaEmision) { this.fechaEmision = fechaEmision; }
+    public String getEstado() { return estado; }
+    public void setEstado(String estado) { this.estado = estado; }
 }

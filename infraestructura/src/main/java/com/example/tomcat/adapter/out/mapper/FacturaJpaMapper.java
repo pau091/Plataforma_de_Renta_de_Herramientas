@@ -25,7 +25,8 @@ public class FacturaJpaMapper {
                 entity.getSubtotal(),
                 entity.getTotal(),
                 entity.getMetodoPago(),
-                entity.getFechaEmision()
+                entity.getFechaEmision(),
+                entity.getEstado()
         );
     }
 
@@ -45,6 +46,7 @@ public class FacturaJpaMapper {
         entity.setSubtotal(factura.getSubtotal());
         entity.setTotal(factura.getTotal());
         entity.setMetodoPago(factura.getMetodoPago());
+        entity.setEstado(factura.getEstado());
         if (factura.getFechaEmision() != null) {
             entity.setFechaEmision(factura.getFechaEmision());
         }

@@ -4,7 +4,9 @@ import com.example.tomcat.port.in.ConsultarReportesUseCase;
 import com.example.tomcat.port.in.dto.ReporteClientesFrecuentes;
 import com.example.tomcat.port.in.dto.ReporteDisponibilidad;
 import com.example.tomcat.port.in.dto.ReporteHerramientasMasAlquiladas;
+import com.example.tomcat.port.in.dto.ReporteIncidencias;
 import com.example.tomcat.port.in.dto.ReporteIngresos;
+import com.example.tomcat.port.in.dto.ReporteRentabilidad;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,5 +40,17 @@ public class ReporteController {
     @GetMapping("/disponibilidad")
     public ResponseEntity<ReporteDisponibilidad> disponibilidad() {
         return ResponseEntity.ok(consultarReportesUseCase.disponibilidad());
+    }
+
+    /** Ingresos menos costo de mantenimiento, por herramienta y global. */
+    @GetMapping("/rentabilidad")
+    public ResponseEntity<ReporteRentabilidad> rentabilidad() {
+        return ResponseEntity.ok(consultarReportesUseCase.rentabilidad());
+    }
+
+    /** Devoluciones con equipo dañado o perdido y el mantenimiento asociado. */
+    @GetMapping("/incidencias")
+    public ResponseEntity<ReporteIncidencias> incidencias() {
+        return ResponseEntity.ok(consultarReportesUseCase.incidencias());
     }
 }

@@ -15,5 +15,6 @@ public interface ReservaRepositoryPort {
     List<Reserva> listarPorProveedor(Long proveedorId);
     List<Reserva> listarPorHerramienta(Long herramientaId);
     List<Reserva> listarPorEstados(Collection<String> estados);
+    List<Reserva> listarPorEstadosDevolucion(Collection<String> estadosDevolucion);
     boolean existeSolape(Long herramientaId, LocalDate fechaInicio, LocalDate fechaFin, Long reservaIdExcluida);
 }

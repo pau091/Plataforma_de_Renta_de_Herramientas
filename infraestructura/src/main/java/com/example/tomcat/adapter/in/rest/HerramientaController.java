@@ -30,18 +30,16 @@ public class HerramientaController {
         this.gestionarHerramientaUseCase = gestionarHerramientaUseCase;
     }
 
+    /** Catálogo con filtros combinables: categoría, proveedor, solo disponibles y texto (q) en nombre o descripción. */
     @GetMapping
     public ResponseEntity<List<Herramienta>> listar(
+            @RequestParam(required = false) Long categoriaId,
             @RequestParam(required = false) Boolean disponibles,
-            @RequestParam(required = false) Long proveedorId
+            @RequestParam(required = false) Long proveedorId,
+            @RequestParam(required = false) String q
     ) {
-        if (proveedorId != null) {
-            return ResponseEntity.ok(gestionarHerramientaUseCase.listarPorProveedor(proveedorId));
-        }
-        if (Boolean.TRUE.equals(disponibles)) {
-            return ResponseEntity.ok(gestionarHerramientaUseCase.listarDisponibles());
-        }
-        return ResponseEntity.ok(gestionarHerramientaUseCase.listar());
+        return ResponseEntity.ok(gestionarHerramientaUseCase.buscar(
+                categoriaId, proveedorId, Boolean.TRUE.equals(disponibles), q));
     }
 
     /** Inventario del proveedor autenticado. */

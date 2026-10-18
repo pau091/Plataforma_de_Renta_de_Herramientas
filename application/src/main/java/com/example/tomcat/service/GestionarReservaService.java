@@ -13,9 +13,14 @@ import com.example.tomcat.repository.HerramientaRepositoryPort;
 import com.example.tomcat.repository.MantenimientoRepositoryPort;
 import com.example.tomcat.repository.ReservaRepositoryPort;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 public class GestionarReservaService implements GestionarReservaUseCase {
+
+    private static final Set<String> ESTADOS = Set.of("PENDIENTE", "ACEPTADA", "CONFIRMADA", "ENTREGADA",
+            "FINALIZADA", "RECHAZADA", "VENCIDA", "CANCELADA");
 
     private final ReservaRepositoryPort reservaRepositoryPort;
     private final HerramientaRepositoryPort herramientaRepositoryPort;
@@ -38,7 +43,7 @@ public class GestionarReservaService implements GestionarReservaUseCase {
     }
 
     @Override
-    public List<Reserva> listar(Solicitante solicitante, Long clienteId, Long proveedorId, Long herramientaId) {
+    public List<Reserva> listar(Solicitante solicitante, Long clienteId, Long proveedorId, Long herramientaId, String estado) {
         List<Reserva> reservas;
         if (solicitante.esCliente()) {
             if (clienteId != null && !solicitante.esUsuario(clienteId)) {
@@ -65,6 +70,13 @@ public class GestionarReservaService implements GestionarReservaUseCase {
         }
         if (clienteId != null) {
             reservas = reservas.stream().filter(r -> clienteId.equals(r.getClienteId())).toList();
+        }
+        if (estado != null && !estado.isBlank()) {
+            String estadoBuscado = estado.trim().toUpperCase();
+            if (!ESTADOS.contains(estadoBuscado)) {
+                throw new DomainException("Estado de reserva no válido. Use uno de: " + String.join(", ", ESTADOS.stream().sorted().toList()) + ".");
+            }
+            reservas = reservas.stream().filter(r -> estadoBuscado.equals(r.getEstado())).toList();
         }
         return reservas;
     }
@@ -142,9 +154,35 @@ public class GestionarReservaService implements GestionarReservaUseCase {
         return actualizada;
     }
 
+    @Override
+    public Reserva modificarFechas(Solicitante solicitante, Long id, LocalDate fechaInicio, LocalDate fechaFin) {
+        Reserva reserva = buscarComoTitular(solicitante, id);
+        if (politica.estaVencida(reserva)) {
+            throw new ConflictoException("La reserva venció: el proveedor no la aceptó dentro del plazo. Cree una nueva.");
+        }
+        reserva.modificarFechas(fechaInicio, fechaFin, politica.hoy());
+        if (reservaRepositoryPort.existeSolape(reserva.getHerramientaId(), fechaInicio, fechaFin, reserva.getId())) {
+            throw new ConflictoException("La herramienta ya tiene una reserva en esas fechas.");
+        }
+        return reservaRepositoryPort.guardar(reserva);
+    }
+
+    @Override
+    public Reserva cancelar(Solicitante solicitante, Long id) {
+        Reserva reserva = buscarComoTitular(solicitante, id);
+        reserva.cancelar();
+        return reservaRepositoryPort.guardar(reserva);
+    }
+
     private Reserva buscar(Long id) {
         return reservaRepositoryPort.buscarPorId(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("La reserva no existe."));
+    }
+
+    private Reserva buscarComoTitular(Solicitante solicitante, Long id) {
+        Reserva reserva = buscar(id);
+        controlAcceso.verificarTitularReserva(solicitante, reserva);
+        return reserva;
     }
 
     private Reserva buscarParaGestionar(Solicitante solicitante, Long id) {
