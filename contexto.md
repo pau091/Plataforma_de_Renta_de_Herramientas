@@ -375,8 +375,8 @@ Para probar los plazos sin esperar, se adelanta el tiempo en la base temporal, p
 | 3.5 Brechas frente al enunciado: CRUD de reservas (PUT/DELETE) y pagos (PUT/DELETE = reembolso), búsqueda por categoría, reportes de rentabilidad e incidencias (V9) | ✅ (71 pruebas HTTP OK) | pendiente (lo hace el usuario) |
 | 4. Base de datos: V10 (índices y CHECK), V11 (datos coherentes), `sql/schema.sql`, `sql/data.sql`, diagrama ER | ✅ (56 pruebas de datos/HTTP + comparación Flyway vs scripts + 71 de regresión) | pendiente (lo hace el usuario) |
 | 5. Documentación de la API: Swagger completo (56 operaciones) y colección de Postman (`postman/`) | ✅ (auditoría del OpenAPI sin problemas; Newman 97 peticiones / 195 aserciones OK, repetible) | pendiente (lo hace el usuario) |
-| **6. Frontend por rol** | ⏳ **Siguiente** | — |
-| 7. Pruebas automatizadas | Pendiente | — |
+| 6. Frontend por rol (HTML/CSS/JS puro + Bootstrap 5, responsivo) | ✅ (prueba de punta a punta con Edge/Playwright: 37/37, sin errores JS; revisión visual escritorio y móvil) | pendiente (lo hace el usuario) |
+| **7. Pruebas automatizadas** | ⏳ **Siguiente** | — |
 | 8. Cierre: README y verificación final | Pendiente | — |
 
 **Postman (`postman/`):** colección `Renta_Herramientas.postman_collection.json` (9 carpetas, 97 peticiones con
@@ -388,19 +388,25 @@ subida multipart. Se ejecuta en orden (los logins guardan tokens y los pasos gua
 **Compilar en Windows:** si `mvnw clean` falla con "Failed to delete target/classes" (OneDrive o el IDE lo bloquean),
 usar `./mvnw -q package -DskipTests` sin `clean`. Para pruebas, ejecutar una **copia** del `.war` (no el de `target/`).
 
-**Fase 6, qué falta:** hoy `infraestructura/src/main/resources/static/index.html` + `app.js` es mínimo:
-- Hay login, catálogo y un formulario de alta de herramienta.
-- `proveedorId: 2` está fijo en el código; el backend lo ignora cuando quien registra es un PROVEEDOR.
-- El botón "Reservar" solo muestra un `alert`.
-
-Debe convertirse en:
-- registro y paneles por rol, usando `GET /api/panel`;
-- para el proveedor, botones **Aceptar/Rechazar** las solicitudes pendientes, y marcar entrega y devolución;
-- para el cliente: reservar con fechas, pagar, descargar la factura y ver su historial;
-- para el admin: usuarios, categorías, pagos y reportes;
-- subida de imágenes;
-- diseño responsivo con Bootstrap 5.
-- El frontend debe enviar `Authorization: Bearer <token>`. El token se guarda en `localStorage`.
+**Frontend (`infraestructura/src/main/resources/static/`):** HTML, CSS y JS puro con módulos ES, Bootstrap 5.3.3 y
+Bootstrap Icons 1.11.3 por CDN (versiones fijas). Navegación por `#/ruta`; menú lateral por rol (offcanvas en móvil).
+- `index.html`, `css/estilos.css` (tema amarillo/gris de obra; en móvil las tablas `.tabla-apilada` se muestran como tarjetas), `images/favicon.svg`.
+- `js/api.js`: `fetch` con `Authorization: Bearer`, sesión en `localStorage` (`renta_sesion`), errores `ErrorApi`, evento
+  `sesion-expirada` ante un 401 (vuelve al login con el mensaje), descarga de factura como blob (necesita el token).
+- `js/ui.js`: plantilla `html` (etiqueta de plantilla) que **escapa todo lo interpolado** (anti-XSS; `raw()` solo para HTML propio), formatos
+  (COP, fechas `yyyy-MM-dd` como día local, instantes UTC → hora local), insignias por estado, toasts, `abrirModal` (formulario
+  con validación y error dentro del modal) y `confirmar`.
+- `js/app.js`: rutas por rol y layout. Cada vista recibe un contenedor nuevo (los listeners no se cruzan entre vistas).
+- `js/vistas/`: `auth.js` (login, registro de cliente y botones de cuentas demo), `comun.js` (reservas con acciones por rol y
+  estado, modales de reservar/cambiar fechas/pagar/devolución/factura, inventario con imagen, mantenimientos, facturas),
+  `cliente.js` (panel, catálogo con texto/categoría/fechas, reservas, facturas), `proveedor.js` (panel con solicitudes,
+  inventario, reservas, mantenimientos, facturación; los nombres de clientes salen de sus facturas porque no puede leer
+  usuarios), `admin.js` (panel, usuarios, herramientas, categorías, alquileres, incidencias, mantenimientos, pagos con
+  corregir/reembolsar, facturas, reportes).
+- Íconos decorativos con `aria-hidden="true"` (si no, el glifo entra en el nombre accesible de los botones).
+- El plazo de 1 hora se muestra en la UI con la constante `PLAZO_MINUTOS` de `comun.js` (si cambia
+  `app.reservas.plazo-maximo`, actualizarla).
+- `SecurityConfig` deja públicos `/`, `/index.html`, `/css/**`, `/js/**`, `/images/**` y `/uploads/**`.
 
 **Fase 7:** no existe `src/test` en ningún módulo. Plan:
 - unitarias de dominio y servicios con JUnit 5 + Mockito, inyectando un `Clock` fijo en `PoliticaVencimiento`;

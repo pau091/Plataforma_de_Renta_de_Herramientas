@@ -43,8 +43,8 @@ public class SecurityConfig {
                 .accessDeniedHandler(jsonSecurityErrorHandler))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/", "/index.html", "/app.js", "/favicon.ico",
-                                 "/css/**", "/js/**", "/images/**").permitAll()
+                // Frontend estático (HTML, CSS, JS e imágenes): público; los datos se piden a la API con el token.
+                .requestMatchers("/", "/index.html", "/favicon.ico", "/css/**", "/js/**", "/images/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
