@@ -4,10 +4,10 @@ Aplicación web para alquilar herramientas y equipos de construcción. Los **pro
 **clientes** reservan por fechas, pagan en línea y descargan su factura, y el **administrador** supervisa usuarios, pagos,
 devoluciones con daños y la rentabilidad de la plataforma.
 
-- **Backend:** API REST con Spring Boot 3 y Java 21, seguridad con JWT y arquitectura hexagonal en tres módulos Maven.
+- **Backend:** API REST con **Spring Boot 4.1** (última versión) y Java 21, seguridad con JWT y arquitectura hexagonal en tres módulos Maven.
 - **Base de datos:** MySQL 8 con migraciones Flyway, scripts SQL y datos de demostración (20 o más registros por entidad).
 - **Frontend:** HTML, CSS y JavaScript puro con Bootstrap 5, responsivo, con un panel distinto para cada rol.
-- **Despliegue:** WAR en **Apache Tomcat 10.1** (con Docker Compose o en un Tomcat instalado).
+- **Despliegue:** WAR en **Apache Tomcat 11** (con Docker Compose o en un Tomcat instalado).
 - **Documentación y pruebas:** Swagger con ejemplos JSON, colección de Postman y 175 pruebas automatizadas.
 
 ---
@@ -44,12 +44,12 @@ devoluciones con daños y la rentabilidad de la plataforma.
 | Área | Tecnología |
 |---|---|
 | Lenguaje | **Java 21** (el enunciado pide Java 17 como mínimo y Java 21 para el backend; se usa 21) |
-| Backend | Spring Boot 3.2.5 (Web, Data JPA / Hibernate, Validation, Security) |
+| Backend | **Spring Boot 4.1.1** (última versión): Spring Framework 7, Spring MVC, Data JPA / Hibernate 7, Validation, Security 7, Jackson 3 |
 | Seguridad | Spring Security + **JWT** (JJWT 0.12.5, HS512), contraseñas con BCrypt |
 | Base de datos | **MySQL 8.4**, migraciones con **Flyway** |
-| Documentación | **Swagger** / OpenAPI 3 (springdoc 2.5.0) y colección de **Postman** |
+| Documentación | **Swagger** / OpenAPI 3 (springdoc 3.1.1) y colección de **Postman** |
 | Frontend | HTML5, CSS3, JavaScript (módulos ES), **Bootstrap 5.3** y Bootstrap Icons |
-| Despliegue | **Apache Tomcat 10.1** (WAR), Docker y Docker Compose |
+| Despliegue | **Apache Tomcat 11** (WAR, Jakarta EE 11), Docker y Docker Compose |
 | Pruebas | JUnit 5, AssertJ, Mockito, Spring Boot Test (MockMvc), **Testcontainers** (MySQL real), Newman |
 
 ---
@@ -113,7 +113,7 @@ cd Plataforma_de_Renta_de_Herramientas
 
 ### Opción A: Docker Compose (recomendada)
 
-Levanta MySQL 8.4 y la aplicación desplegada como `ROOT.war` en un **Apache Tomcat 10.1** con JDK 21. Flyway crea las tablas y
+Levanta MySQL 8.4 y la aplicación desplegada como `ROOT.war` en un **Apache Tomcat 11** con JDK 21. Flyway crea las tablas y
 carga los datos de demostración la primera vez.
 
 ```bash
@@ -159,7 +159,8 @@ ejecutar. Por ejemplo: `DB_URL=jdbc:mysql://localhost:3306/renta_herramientas_db
 ### Opción C: despliegue en un Apache Tomcat instalado
 
 1. Genere el WAR con `./mvnw clean package -DskipTests`.
-2. Use **Apache Tomcat 10.1** (Jakarta EE 10, la misma versión de la imagen Docker) ejecutándose con **Java 21**.
+2. Use **Apache Tomcat 11** (Jakarta EE 11, la misma versión de la imagen Docker) ejecutándose con **Java 21**.
+   Spring Boot 4 no funciona en Tomcat 10.1.
 3. Copie `infraestructura/target/infraestructura-0.0.1-SNAPSHOT.war` a `<TOMCAT>/webapps/ROOT.war` para que quede en la raíz `/`.
 4. Configure la conexión en `<TOMCAT>/bin/setenv.bat` (Windows) o `setenv.sh` (Linux):
 

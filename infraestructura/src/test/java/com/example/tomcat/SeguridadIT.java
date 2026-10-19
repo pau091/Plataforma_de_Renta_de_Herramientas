@@ -1,6 +1,6 @@
 package com.example.tomcat;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -62,7 +62,7 @@ class SeguridadIT extends IntegracionBase {
     @DisplayName("Datos inválidos → 400 con el error de cada campo")
     void registroInvalido() throws Exception {
         JsonNode r = esperar(POST("/api/auth/registro", null, Map.of("nombre", "", "email", "no-es-correo", "password", "123")), 400);
-        assertThat(r.get("errores").fieldNames()).toIterable().containsExactlyInAnyOrder("nombre", "email", "password");
+        assertThat(r.get("errores").propertyNames()).containsExactlyInAnyOrder("nombre", "email", "password");
     }
 
     @Test

@@ -1,7 +1,7 @@
 package com.example.tomcat.config;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
@@ -188,7 +188,7 @@ public class OpenApiConfig {
     private static Object leer(ObjectMapper objectMapper, String json) {
         try {
             return objectMapper.readValue(json, Object.class);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Ejemplo JSON inválido en la documentación: " + json, e);
         }
     }

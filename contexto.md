@@ -56,7 +56,7 @@ Requisitos clave del enunciado:
 | Carpeta padre `Desktop\tomcat` | Solo contiene `src\tomcat`. Había un proyecto "Hello world" del IDE que se envió a la Papelera con permiso del usuario |
 | JDK | **Temurin 21** en `C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot`. También hay JDK 17 y 25 instalados |
 | `JAVA_HOME` (sistema) | Apunta al JDK 21, que va primero en el PATH. Terminales abiertas antes de la instalación pueden seguir viendo el 17 |
-| Build | Maven Wrapper `./mvnw` con Spring Boot 3.2.5 |
+| Build | Maven Wrapper `./mvnw` con Spring Boot 4.1.1 |
 | Docker | Docker Desktop. Hay que abrirlo antes de usar `docker` |
 | MySQL local de Windows | Servicio `MySQL80` en el puerto **3306**. **No se usa** y no tiene el usuario `mysql/mysql` |
 | Otros contenedores del usuario | `postgres_db` (5433), `pgadmin_web` (**8081**) y `postgres-dev-workspace`, de otro proyecto (`pgsqlcontainer`). **No tocarlos** |
@@ -78,7 +78,7 @@ Detalles prácticos que ya causaron problemas:
 
 ```powershell
 cd C:\Users\developer\OneDrive\Desktop\tomcat\src\tomcat
-docker compose up -d --build        # MySQL 8.4 + app (WAR) en Tomcat 10.1 con JDK 21
+docker compose up -d --build        # MySQL 8.4 + app (WAR) en Tomcat 11 con JDK 21
 docker compose logs -f tomcat       # esperar "Server startup in [...] milliseconds"
 docker compose down                 # apagar (conserva datos)
 docker compose down -v              # apagar y BORRAR datos (vuelve a los datos de prueba)
@@ -111,7 +111,7 @@ APP_UPLOADS_DIR=/ruta/temporal \
 
 ## 5. Arquitectura
 
-Arquitectura hexagonal en un proyecto **Maven multimódulo**. El `pom.xml` padre usa `spring-boot-starter-parent` 3.2.5,
+Arquitectura hexagonal en un proyecto **Maven multimódulo**. El `pom.xml` padre usa `spring-boot-starter-parent` **4.1.1** (la última, como pide el enunciado),
 Java 21 y JJWT 0.12.5.
 
 ```
@@ -422,8 +422,8 @@ Bootstrap Icons 1.11.3 por CDN (versiones fijas). Navegación por `#/ruta`; men�
   `SeguridadIT` (JWT, 401/403 por rol, usuario desactivado, CORS, recursos públicos), `FlujoAlquilerIT` (flujo completo,
   validaciones, PUT/DELETE de reservas, reembolso, vencimiento), `CatalogoYGestionIT` (filtros, inventario, imágenes,
   categorías, usuarios), `MigracionesYDatosIT` (Flyway V1–V11, ≥20 registros, coherencia, CHECK y RESTRICT).
-- **Docker Engine 29+** rechaza la API que usa Testcontainers 1.19 (la de Spring Boot 3.2.5): por eso el `pom` padre fija
-  `testcontainers.version` en **1.21.4**. Si se actualiza Spring Boot, revisar esa propiedad.
+- Spring Boot 4.1.1 trae Testcontainers 2.0.5 (artefactos `testcontainers-mysql` y `testcontainers-junit-jupiter`),
+  compatible con Docker Engine 29+.
 - Se comprobó que las pruebas detectan errores reales (mutación temporal de `ControlAcceso` → fallan las 2 pruebas de esa regla).
 
 **Fase 8 (cierre):** `README.md` reescrito para el trainer (funcionalidades, tecnologías, arquitectura, 3 formas de
@@ -442,6 +442,18 @@ problemas). Verificado desde un **clon limpio**. Hallazgo: en Windows, clonar en
   categoría, descripción, precio y reserva por fechas con disponibilidad en vivo.
 - `MigracionesYDatosIT` verifica que las 30 herramientas tengan foto y que cada archivo se sirva (175 pruebas en total).
 - Si Docker Desktop no está abierto, las pruebas `*IT` se omiten y la app de Docker no arranca: abrirlo primero.
+
+**Actualización a Spring Boot 4.1.1 (el enunciado pide la última versión):**
+- `pom` padre 4.1.1; `spring-boot-starter-webmvc` (antes `-web`), `spring-boot-starter-flyway` (Flyway ya no se
+  autoconfigura solo con `flyway-core`), springdoc **3.1.1**, pruebas con `spring-boot-starter-webmvc-test` y
+  `spring-boot-starter-security-test`.
+- **Jackson 3** (`tools.jackson.*`): `OpenApiConfig`, `JsonSecurityErrorHandler` y las pruebas usan
+  `tools.jackson.databind.ObjectMapper/JsonNode` (`JacksonException` no es verificada; `fieldNames()` → `propertyNames()`).
+  Las anotaciones `com.fasterxml.jackson.annotation` no cambian.
+- `@AutoConfigureMockMvc` está en `org.springframework.boot.webmvc.test.autoconfigure`. En Spring 7 el builder multipart no
+  hereda de `MockHttpServletRequestBuilder`: los helpers de `IntegracionBase` usan `AbstractMockHttpServletRequestBuilder`.
+- Se quitó `hibernate.dialect` (Hibernate 7 lo detecta). Tomcat 11 obligatorio (Docker `tomcat:11.0-jdk21`).
+- Verificado: 175/175 pruebas, Swagger sin problemas, Newman 97/195, frontend 41/41, Docker en Tomcat 11.0.27.
 
 **Pendientes que dependen del usuario (no de código):**
 - El enunciado pide un repositorio **privado** llamado `Proyecto_RentaHerramientas_ApellidoNombre`, compartido con el
@@ -470,7 +482,7 @@ problemas). Verificado desde un **clon limpio**. Hallazgo: en Windows, clonar en
 - `.env`: local e ignorado por Git, con `DB_URL` al puerto 3307. `.env.example` es la plantilla versionada.
 - `.gitignore` incluye `.env` y `uploads/`.
 - `.dockerignore` excluye `**/target/`, `.git/`, `.idea/`, `.vscode/`, `.env`, `*.iml` y `uploads/`.
-- `Dockerfile`: dos etapas, `maven:3.9.6-eclipse-temurin-21` → `tomcat:10.1-jdk21`. El WAR se despliega como `ROOT.war`.
+- `Dockerfile`: dos etapas, `maven:3.9.6-eclipse-temurin-21` → `tomcat:11.0-jdk21` (Boot 4 = Jakarta EE 11). El WAR se despliega como `ROOT.war`.
 - `compose.yaml`:
   - servicio `mysql` (`mysql:8.4`, puerto 3307:3306, healthcheck);
   - servicio `tomcat` (puerto 8080, variables `DB_*`, `APP_UPLOADS_DIR` y `APP_ZONA_HORARIA`, volumen `uploads`).

@@ -1,9 +1,9 @@
 package com.example.tomcat;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -11,6 +11,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -91,7 +92,8 @@ public abstract class IntegracionBase {
         }
     }
 
-    protected MockHttpServletRequestBuilder conToken(MockHttpServletRequestBuilder peticion, String email) {
+    /** Agrega el token; sirve para peticiones normales y multipart (en Spring 7 no comparten la misma clase). */
+    protected <T extends AbstractMockHttpServletRequestBuilder<T>> T conToken(T peticion, String email) {
         return email == null ? peticion : peticion.header(HttpHeaders.AUTHORIZATION, "Bearer " + token(email));
     }
 
@@ -120,7 +122,7 @@ public abstract class IntegracionBase {
     }
 
     /** Ejecuta la petición, exige el código HTTP indicado y devuelve el cuerpo JSON (o null si no tiene). */
-    protected JsonNode esperar(MockHttpServletRequestBuilder peticion, int status) throws Exception {
+    protected JsonNode esperar(AbstractMockHttpServletRequestBuilder<?> peticion, int status) throws Exception {
         MvcResult r = mvc.perform(peticion).andReturn();
         String cuerpo = r.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
         if (r.getResponse().getStatus() != status) {

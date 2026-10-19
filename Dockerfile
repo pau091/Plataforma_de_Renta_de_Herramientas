@@ -13,7 +13,8 @@ RUN mvn clean package -DskipTests
 # ==========================================
 # ETAPA 2: Despliegue en Apache Tomcat
 # ==========================================
-FROM tomcat:10.1-jdk21
+# Spring Boot 4 usa Jakarta EE 11 (Servlet 6.1): requiere Apache Tomcat 11.
+FROM tomcat:11.0-jdk21
 WORKDIR /usr/local/tomcat
 
 # Eliminamos las aplicaciones por defecto de Tomcat
