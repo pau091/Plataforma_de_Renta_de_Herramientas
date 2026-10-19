@@ -111,6 +111,41 @@ cd Plataforma_de_Renta_de_Herramientas
 > En Windows, si `git clone` muestra `Filename too long`, ejecute antes `git config --global core.longpaths true`
 > o clone en una carpeta con una ruta más corta (por ejemplo `C:\proyectos`).
 
+### Preparar Docker (macOS, Linux o Windows)
+
+Docker no necesita ninguna configuración especial para este proyecto: basta con instalarlo y tenerlo **abierto**. Las
+imágenes que se usan (MySQL 8.4, Maven y Tomcat 11) funcionan en procesadores Intel/AMD y en Mac con chip Apple (M1, M2, M3...).
+
+**macOS**
+1. Descargue **Docker Desktop** desde https://www.docker.com/products/docker-desktop/ y elija la versión de su procesador:
+   *Apple Silicon* (chip M1/M2/M3...) o *Intel* (menú  → Acerca de este Mac lo indica).
+2. Abra el `.dmg`, arrastre Docker a *Aplicaciones* y ábralo. Acepte los permisos que pida.
+3. Espere a que el ícono de la ballena en la barra superior indique *Docker Desktop is running*.
+4. Compruebe en la Terminal: `docker --version` y `docker compose version`.
+
+**Linux (Ubuntu / Debian)**
+```bash
+curl -fsSL https://get.docker.com | sudo sh     # instala Docker Engine y el plugin "docker compose"
+sudo usermod -aG docker $USER                   # usar docker sin sudo (cierre sesión y vuelva a entrar)
+docker --version && docker compose version
+```
+(En otras distribuciones, o si prefiere una interfaz gráfica, puede instalar Docker Desktop para Linux.)
+
+**Windows:** instale Docker Desktop y ábralo antes de ejecutar los comandos.
+
+### Ejecutar después de clonar (macOS / Linux)
+
+```bash
+git clone https://github.com/pau091/Plataforma_de_Renta_de_Herramientas.git
+cd Plataforma_de_Renta_de_Herramientas
+docker compose up -d --build        # la primera vez tarda unos minutos: descarga imágenes y compila
+docker compose logs -f tomcat       # espere "Server startup in [...] milliseconds" y salga con Ctrl+C
+```
+
+Abra http://localhost:8080 e ingrese con una de las [cuentas de demostración](#cuentas-de-demostración).
+Para las pruebas (opcional): `./mvnw verify` (requiere JDK 21 y Docker abierto). Si la terminal responde
+`Permission denied` al ejecutar `./mvnw`, ejecute una vez `chmod +x mvnw`.
+
 ### Opción A: Docker Compose (recomendada)
 
 Levanta MySQL 8.4 y la aplicación desplegada como `ROOT.war` en un **Apache Tomcat 11** con JDK 21. Flyway crea las tablas y
@@ -604,6 +639,9 @@ npx newman run Renta_Herramientas.postman_collection.json -e Renta_Herramientas.
 | `Filename too long` al clonar en Windows | `git config --global core.longpaths true` o clonar en una ruta corta |
 | El puerto 8080 o 3307 ya está en uso | Cambie el puerto publicado en `compose.yaml` (por ejemplo `"8090:8080"`) |
 | Las pruebas de integración aparecen como *skipped* | Inicie Docker Desktop y vuelva a ejecutar `./mvnw verify` |
+| `./mvnw: Permission denied` (macOS / Linux) | `chmod +x mvnw` y vuelva a ejecutar |
+| `permission denied ... docker.sock` (Linux) | `sudo usermod -aG docker $USER`, cierre sesión y vuelva a entrar |
+| En macOS con Colima (en vez de Docker Desktop) las pruebas de integración no encuentran Docker | `export DOCKER_HOST=unix://$HOME/.colima/default/docker.sock` y `export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock` |
 | Error de versión de Java al compilar | Verifique que `JAVA_HOME` apunte a un JDK 21 (`java -version`) |
 | `mvnw clean` no puede borrar `target/` en Windows | Cierre la aplicación o el IDE que tenga abierto el WAR, o compile sin `clean` |
 | Las reservas de demostración aparecen vencidas | Es lo esperado una hora después de crear la base (ver [Datos de demostración](#datos-de-demostración)) |
