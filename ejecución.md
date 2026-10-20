@@ -9,6 +9,7 @@ EJECUCION CODIGO
 git clone https://github.com/pau091/Plataforma_de_Renta_de_Herramientas.git
 cd Plataforma_de_Renta_de_Herramientas
 docker compose up -d --build
+Start-Process http://localhost:8080
 
 --------------------------------------------------
 MAC 
