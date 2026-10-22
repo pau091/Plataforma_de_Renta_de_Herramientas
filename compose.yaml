@@ -9,8 +9,8 @@ services:
       MYSQL_ROOT_PASSWORD: mysql
     ports:
       # 3307 en el equipo para no chocar con un MySQL instalado en Windows (puerto 3306).
-      # Dentro de Docker la app sigue usando mysql:3306.
-      - "3307:3306"
+      # Dentro de Docker la app sigue usando mysql:3306. Se puede cambiar con DB_PORT=3308.
+      - "${DB_PORT:-3307}:3306"
     volumes:
       - mysqldata:/var/lib/mysql
     healthcheck:
@@ -24,7 +24,8 @@ services:
     build: .
     container_name: tomcat_rentas
     ports:
-      - "8080:8080"
+      # Si el 8080 ya está ocupado (p. ej. un Tomcat instalado en el sistema): APP_PORT=8081 docker compose up -d
+      - "${APP_PORT:-8080}:8080"
     environment:
       - DB_URL=jdbc:mysql://mysql:3306/renta_herramientas_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       - DB_USERNAME=mysql
