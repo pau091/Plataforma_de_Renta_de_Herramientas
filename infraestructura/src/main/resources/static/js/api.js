@@ -86,13 +86,13 @@ export function conParametros(ruta, parametros) {
     return texto ? `${ruta}?${texto}` : ruta;
 }
 
-/** Descarga la factura en HTML (la petición necesita el token, así que no basta con un enlace). */
+/** Descarga la factura en PDF (la petición necesita el token, así que no basta con un enlace). */
 export async function descargarFactura(id, numero) {
     const { blob } = await api.blob(`/facturas/${id}/descargar`);
     const url = URL.createObjectURL(blob);
     const enlace = document.createElement('a');
     enlace.href = url;
-    enlace.download = `${numero || 'factura'}.html`;
+    enlace.download = `${numero || 'factura'}.pdf`;
     document.body.appendChild(enlace);
     enlace.click();
     enlace.remove();

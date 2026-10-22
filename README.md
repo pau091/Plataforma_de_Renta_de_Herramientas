@@ -48,6 +48,7 @@ devoluciones con daños y la rentabilidad de la plataforma.
 | Seguridad | Spring Security + **JWT** (JJWT 0.12.5, HS512), contraseñas con BCrypt |
 | Base de datos | **MySQL 8.4**, migraciones con **Flyway** |
 | Documentación | **Swagger** / OpenAPI 3 (springdoc 3.1.1) y colección de **Postman** |
+| Facturas | **PDF** generado con OpenPDF 3.0.5 |
 | Frontend | HTML5, CSS3, JavaScript (módulos ES), **Bootstrap 5.3** y Bootstrap Icons |
 | Despliegue | **Apache Tomcat 11** (WAR, Jakarta EE 11), Docker y Docker Compose |
 | Pruebas | JUnit 5, AssertJ, Mockito, Spring Boot Test (MockMvc), **Testcontainers** (MySQL real), Newman |
@@ -419,7 +420,7 @@ endpoint con su descripción, los roles permitidos, ejemplos JSON de petición y
 | GET | `/api/pagos[?reservaId]`, `/api/pagos/{id}`, `/api/pagos/reserva/{id}` | Historial de pagos | Según el rol |
 | PUT / DELETE | `/api/pagos/{id}` | Corregir el método / reembolsar | Admin |
 | GET | `/api/facturas[?clienteId]`, `/{id}`, `/pago/{pagoId}`, `/reserva/{reservaId}` | Facturas | Según el rol |
-| GET | `/api/facturas/{id}/descargar` | Descargar el comprobante (HTML) | Según el rol |
+| GET | `/api/facturas/{id}/descargar` | Descargar la factura en PDF | Según el rol |
 | GET / POST | `/api/mantenimientos[?herramientaId\|reservaId]`, `/api/mantenimientos/{id}/cerrar` | Mantenimientos | Proveedor, Admin |
 | GET | `/api/reportes/ingresos`, `/rentabilidad`, `/herramientas-mas-alquiladas`, `/clientes-frecuentes`, `/disponibilidad`, `/incidencias` | Reportes | Admin |
 | GET | `/api/panel` | Resumen según el rol | Todos |
@@ -550,6 +551,10 @@ aunque reserven en el mismo instante:
 - El pago, la confirmación de la reserva y la factura (`FAC-000001`, ...) se registran en **una sola transacción**.
 - El administrador puede reembolsar un pago mientras la herramienta no se haya entregado: el pago queda `REEMBOLSADO`, la reserva
   `CANCELADA` y la factura `ANULADA`.
+- La factura se descarga en **PDF** (`FAC-000001.pdf`) desde la página o con `GET /api/facturas/{id}/descargar`. Muestra el
+  cliente, la herramienta, el periodo, los días, la tarifa y el total; la fecha de emisión sale en la hora del negocio.
+  Una factura anulada lleva el aviso "FACTURA ANULADA" y una marca de agua. El PDF lo genera `FacturaPdfRenderer` en el
+  adaptador REST: el dominio y los casos de uso no conocen el formato.
 
 **Devolución.**
 - `DANADO`: la herramienta pasa a `MANTENIMIENTO` y se abre un mantenimiento ligado a la reserva.

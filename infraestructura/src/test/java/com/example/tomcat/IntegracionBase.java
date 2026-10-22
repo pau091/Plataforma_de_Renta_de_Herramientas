@@ -1,5 +1,7 @@
 package com.example.tomcat;
 
+import org.openpdf.text.pdf.PdfReader;
+import org.openpdf.text.pdf.parser.PdfTextExtractor;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +24,7 @@ import java.time.ZoneId;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -129,6 +132,22 @@ public abstract class IntegracionBase {
             throw new AssertionError("Se esperaba HTTP " + status + " pero fue " + r.getResponse().getStatus() + ": " + cuerpo);
         }
         return cuerpo.isBlank() ? null : json.readTree(cuerpo);
+    }
+
+    /** Texto de todas las páginas de un PDF; además falla si el archivo no es un PDF válido. */
+    protected static String textoDelPdf(byte[] pdf) throws Exception {
+        assertThat(new String(pdf, 0, 5, java.nio.charset.StandardCharsets.US_ASCII)).isEqualTo("%PDF-");
+        PdfReader lector = new PdfReader(pdf);
+        try {
+            PdfTextExtractor extractor = new PdfTextExtractor(lector);
+            StringBuilder texto = new StringBuilder();
+            for (int pagina = 1; pagina <= lector.getNumberOfPages(); pagina++) {
+                texto.append(extractor.getTextFromPage(pagina)).append('\n');
+            }
+            return texto.toString();
+        } finally {
+            lector.close();
+        }
     }
 
     // ------------------------------------------------------------------ datos

@@ -66,6 +66,20 @@
             <version>3.1.1</version>
         </dependency>
 
+        <!-- Facturas en PDF (OpenPDF, licencia LGPL/MPL) -->
+        <dependency>
+            <groupId>com.github.librepdf</groupId>
+            <artifactId>openpdf</artifactId>
+            <version>3.0.5</version>
+            <exclusions>
+                <!-- Solo sirve para leer PDFs con compresión Brotli; generar facturas no lo usa y trae binarios nativos. -->
+                <exclusion>
+                    <groupId>com.aayushatharva.brotli4j</groupId>
+                    <artifactId>brotli4j</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
         <!-- JWT -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>

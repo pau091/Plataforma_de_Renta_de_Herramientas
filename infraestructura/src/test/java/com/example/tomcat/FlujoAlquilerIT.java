@@ -8,7 +8,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MvcResult;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.stream.StreamSupport;
 
@@ -57,8 +56,10 @@ class FlujoAlquilerIT extends IntegracionBase {
         assertThat(factura.get("estado").asText()).isEqualTo("VIGENTE");
         MvcResult descarga = mvc.perform(GET("/api/facturas/" + factura.get("id").asLong() + "/descargar", CLIENTE)).andReturn();
         assertThat(descarga.getResponse().getStatus()).isEqualTo(200);
-        assertThat(descarga.getResponse().getHeader(HttpHeaders.CONTENT_DISPOSITION)).contains(factura.get("numero").asText() + ".html");
-        assertThat(descarga.getResponse().getContentAsString(StandardCharsets.UTF_8)).contains("Comprobante de pago");
+        assertThat(descarga.getResponse().getHeader(HttpHeaders.CONTENT_DISPOSITION)).contains(factura.get("numero").asText() + ".pdf");
+        assertThat(descarga.getResponse().getContentType()).isEqualTo("application/pdf");
+        assertThat(textoDelPdf(descarga.getResponse().getContentAsByteArray()))
+                .contains("FACTURA", factura.get("numero").asText(), "Total pagado", "$ 90.000 COP", "VIGENTE");
         esperar(GET("/api/facturas/" + factura.get("id").asLong(), OTRO_CLIENTE), 403);
 
         // Entrega y devolución con daño.
@@ -146,6 +147,9 @@ class FlujoAlquilerIT extends IntegracionBase {
         JsonNode factura = esperar(GET("/api/facturas/pago/" + pago, CLIENTE), 200);
         assertThat(factura.get("estado").asText()).isEqualTo("ANULADA");
         assertThat(factura.get("metodoPago").asText()).isEqualTo("TRANSFERENCIA");
+        byte[] pdf = mvc.perform(GET("/api/facturas/" + factura.get("id").asLong() + "/descargar", ADMIN))
+                .andReturn().getResponse().getContentAsByteArray();
+        assertThat(textoDelPdf(pdf)).contains("FACTURA ANULADA", "TRANSFERENCIA");
         var ingresosDespues = esperar(GET("/api/reportes/ingresos", ADMIN), 200).get("totalIngresos").decimalValue();
         assertThat(ingresosAntes.subtract(ingresosDespues)).isEqualByComparingTo("80000");
         esperar(DELETE("/api/pagos/" + pago, ADMIN), 400);

@@ -15,7 +15,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Tag(name = "Facturas")
@@ -26,11 +25,11 @@ public class FacturaController {
     private static final String SIN_PERMISO = "No tiene permiso para acceder a esta factura.";
 
     private final GestionarFacturaUseCase gestionarFacturaUseCase;
-    private final FacturaHtmlRenderer facturaHtmlRenderer;
+    private final FacturaPdfRenderer facturaPdfRenderer;
 
-    public FacturaController(GestionarFacturaUseCase gestionarFacturaUseCase, FacturaHtmlRenderer facturaHtmlRenderer) {
+    public FacturaController(GestionarFacturaUseCase gestionarFacturaUseCase, FacturaPdfRenderer facturaPdfRenderer) {
         this.gestionarFacturaUseCase = gestionarFacturaUseCase;
-        this.facturaHtmlRenderer = facturaHtmlRenderer;
+        this.facturaPdfRenderer = facturaPdfRenderer;
     }
 
     @Operation(summary = "Listar facturas",
@@ -76,20 +75,19 @@ public class FacturaController {
 
     @Operation(summary = "Descargar una factura",
             description = "**Roles:** el CLIENTE facturado, el PROVEEDOR de la herramienta o ADMIN. Devuelve el comprobante "
-                    + "como archivo HTML adjunto (`FAC-000001.html`), listo para abrir o imprimir. Si el pago se reembolsó, "
-                    + "muestra la marca FACTURA ANULADA.")
-    @ApiResponse(responseCode = "200", description = "Archivo HTML de la factura",
-            content = @Content(mediaType = MediaType.TEXT_HTML_VALUE, schema = @Schema(type = "string", format = "binary")))
+                    + "como archivo **PDF** adjunto (`FAC-000001.pdf`). Si el pago se reembolsó, muestra la marca "
+                    + "FACTURA ANULADA. En Swagger aparece el enlace \"Download file\" en la respuesta.")
+    @ApiResponse(responseCode = "200", description = "Archivo PDF de la factura",
+            content = @Content(mediaType = MediaType.APPLICATION_PDF_VALUE, schema = @Schema(type = "string", format = "binary")))
     @ApiResponse(responseCode = "403", description = SIN_PERMISO)
     @ApiResponse(responseCode = "404", description = "La factura no existe.")
-    @GetMapping(value = "/{id}/descargar", produces = MediaType.TEXT_HTML_VALUE)
+    @GetMapping(value = "/{id}/descargar", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> descargar(@AuthenticationPrincipal UsuarioAutenticado usuario,
                                             @Parameter(example = "1") @PathVariable Long id) {
         Factura factura = gestionarFacturaUseCase.buscarPorId(usuario.solicitante(), id);
-        byte[] contenido = facturaHtmlRenderer.render(factura).getBytes(StandardCharsets.UTF_8);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + factura.getNumero() + ".html")
-                .contentType(MediaType.TEXT_HTML)
-                .body(contenido);
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + factura.getNumero() + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(facturaPdfRenderer.render(factura));
     }
 }
