@@ -5,6 +5,7 @@ import com.example.tomcat.exception.DomainException;
 import com.example.tomcat.model.Usuario;
 import com.example.tomcat.port.in.GestionarUsuarioUseCase;
 import com.example.tomcat.port.in.RegistrarUsuarioUseCase;
+import com.example.tomcat.security.UsuarioAutenticado;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -16,6 +17,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -52,12 +54,13 @@ public class UsuarioController {
         )));
     }
 
-    @Operation(summary = "Listar proveedores y clientes", description = "**Rol:** ADMIN. Sin filtro devuelve primero los clientes y luego los proveedores.")
+    @Operation(summary = "Listar proveedores y clientes", description = "**Rol:** ADMIN. Sin filtro devuelve primero los "
+            + "clientes y luego los proveedores. Con `rol=ADMIN` lista los administradores (útil para cambiarles el rol).")
     @ApiResponse(responseCode = "200", description = "Listado de usuarios")
-    @ApiResponse(responseCode = "400", description = "Solo se pueden listar clientes y proveedores.")
+    @ApiResponse(responseCode = "400", description = "Rol no válido. Use CLIENTE, PROVEEDOR o ADMIN.")
     @GetMapping
     public ResponseEntity<List<UsuarioResponse>> listar(
-            @Parameter(description = "Filtra por rol: CLIENTE o PROVEEDOR", example = "PROVEEDOR")
+            @Parameter(description = "Filtra por rol: CLIENTE, PROVEEDOR o ADMIN", example = "PROVEEDOR")
             @RequestParam(required = false) String rol) {
         return ResponseEntity.ok(resolverListado(rol).stream().map(UsuarioResponse::from).toList());
     }
@@ -116,6 +119,24 @@ public class UsuarioController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Cambiar el rol de un usuario (ascender o bajar de rango)",
+            description = "**Rol:** solo el **administrador principal** (`app.admin-principal`, por defecto admin@rentas.com). "
+                    + "Pasa a un usuario ya registrado a CLIENTE, PROVEEDOR o ADMIN. No se puede cambiar el rol del "
+                    + "administrador principal, ni pasar a CLIENTE a un proveedor con herramientas. La API aplica el rol "
+                    + "de inmediato; el usuario debe volver a iniciar sesión para ver el menú de su nuevo rol.")
+    @ApiResponse(responseCode = "200", description = "Rol actualizado")
+    @ApiResponse(responseCode = "400", description = "Rol no válido. Use ADMIN, PROVEEDOR o CLIENTE.")
+    @ApiResponse(responseCode = "403", description = "Solo el administrador principal puede cambiar roles.")
+    @ApiResponse(responseCode = "404", description = "El usuario no existe.")
+    @ApiResponse(responseCode = "409", description = "El rol del administrador principal no se puede cambiar.")
+    @PatchMapping("/{id}/rol")
+    public ResponseEntity<UsuarioResponse> cambiarRol(@AuthenticationPrincipal UsuarioAutenticado usuario,
+                                                      @Parameter(example = "12") @PathVariable Long id,
+                                                      @Valid @RequestBody CambiarRolRequest request) {
+        return ResponseEntity.ok(UsuarioResponse.from(
+                gestionarUsuarioUseCase.cambiarRol(usuario.solicitante(), id, request.rol())));
+    }
+
     private List<Usuario> resolverListado(String rol) {
         if (rol == null || rol.isBlank()) {
             List<Usuario> usuarios = new ArrayList<>();
@@ -129,7 +150,10 @@ public class UsuarioController {
         if ("PROVEEDOR".equalsIgnoreCase(rol)) {
             return gestionarUsuarioUseCase.listarProveedores();
         }
-        throw new DomainException("Solo se pueden listar clientes y proveedores.");
+        if ("ADMIN".equalsIgnoreCase(rol)) {
+            return gestionarUsuarioUseCase.listarAdministradores();
+        }
+        throw new DomainException("Rol no válido. Use CLIENTE, PROVEEDOR o ADMIN.");
     }
 
     public record CrearUsuarioRequest(
@@ -165,5 +189,11 @@ public class UsuarioController {
             @Schema(example = "NuevaClave2026*", description = "Opcional: nueva contraseña")
             @Size(min = 8, max = 72, message = "La contraseña debe tener entre 8 y 72 caracteres.")
             String password
+    ) {}
+
+    public record CambiarRolRequest(
+            @Schema(example = "PROVEEDOR", allowableValues = {"CLIENTE", "PROVEEDOR", "ADMIN"})
+            @NotBlank(message = "El rol es obligatorio (CLIENTE, PROVEEDOR o ADMIN).")
+            String rol
     ) {}
 }

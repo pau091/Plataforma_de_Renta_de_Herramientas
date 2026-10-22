@@ -18,6 +18,8 @@ public record Solicitante(Long id, Rol rol) {
     public boolean esAdmin() { return rol == Rol.ADMIN; }
     public boolean esProveedor() { return rol == Rol.PROVEEDOR; }
     public boolean esCliente() { return rol == Rol.CLIENTE; }
+    /** Puede reservar y pagar a su nombre: los clientes y también los proveedores (alquilando equipos de otros). */
+    public boolean puedeAlquilar() { return esCliente() || esProveedor(); }
 
     public boolean esUsuario(Long usuarioId) {
         return id.equals(usuarioId);

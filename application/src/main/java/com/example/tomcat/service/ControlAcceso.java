@@ -14,6 +14,8 @@ import java.util.List;
  * - ADMIN accede a todo.
  * - PROVEEDOR solo gestiona sus herramientas y lo relacionado con ellas (reservas, pagos, facturas, mantenimientos).
  * - CLIENTE solo accede a sus propias reservas, pagos y facturas.
+ * - Un PROVEEDOR también puede alquilar equipos de otros: como titular de una reserva tiene los mismos permisos que
+ *   un cliente sobre ella (por eso el titular se compara por id, sin importar el rol).
  */
 public class ControlAcceso {
 
@@ -38,7 +40,7 @@ public class ControlAcceso {
         if (solicitante.esAdmin()) {
             return;
         }
-        if (solicitante.esCliente() && solicitante.esUsuario(reserva.getClienteId())) {
+        if (solicitante.esUsuario(reserva.getClienteId())) {
             return;
         }
         if (solicitante.esProveedor() && esPropietario(solicitante, reserva.getHerramientaId())) {
@@ -58,12 +60,12 @@ public class ControlAcceso {
         throw new AccesoDenegadoException("Solo el proveedor dueño de la herramienta puede gestionar esta reserva.");
     }
 
-    /** Modificar o cancelar una reserva: solo el cliente que la hizo o un admin. */
+    /** Modificar o cancelar una reserva: solo quien la hizo (cliente o proveedor que alquila) o un admin. */
     public void verificarTitularReserva(Solicitante solicitante, Reserva reserva) {
         if (solicitante.esAdmin()) {
             return;
         }
-        if (solicitante.esCliente() && solicitante.esUsuario(reserva.getClienteId())) {
+        if (solicitante.esUsuario(reserva.getClienteId())) {
             return;
         }
         throw new AccesoDenegadoException("Solo el cliente que hizo la reserva puede modificarla o cancelarla.");
@@ -73,7 +75,7 @@ public class ControlAcceso {
         if (solicitante.esAdmin()) {
             return;
         }
-        if (solicitante.esCliente() && solicitante.esUsuario(factura.getClienteId())) {
+        if (solicitante.esUsuario(factura.getClienteId())) {
             return;
         }
         if (solicitante.esProveedor() && esPropietario(solicitante, factura.getHerramientaId())) {

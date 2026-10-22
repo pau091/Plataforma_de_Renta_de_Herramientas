@@ -36,8 +36,11 @@ export async function inicio(contenedor, usuario) {
     }
 }
 
-/** Catálogo: búsqueda por texto, categoría y disponibilidad (estado y, opcionalmente, rango de fechas). */
-export async function catalogo(contenedor) {
+/**
+ * Catálogo: búsqueda por texto, categoría y disponibilidad (estado y, opcionalmente, rango de fechas).
+ * El proveedor también lo usa para alquilar: no ve sus propias herramientas y, al reservar, va a "Mis alquileres".
+ */
+export async function catalogo(contenedor, usuario, { destino = '#/reservas', excluirProveedorId } = {}) {
     cargando(contenedor);
     let categorias;
     try {
@@ -81,6 +84,9 @@ export async function catalogo(contenedor) {
                 }))).map(h => h.id));
                 herramientas = herramientas.filter(h => libres.has(h.id));
             }
+            if (excluirProveedorId) {
+                herramientas = herramientas.filter(h => h.proveedorId !== excluirProveedorId);
+            }
             pintar(conFechas ? f : {});
         } catch (error) {
             resultados.innerHTML = '';
@@ -118,7 +124,7 @@ export async function catalogo(contenedor) {
         if (!boton) return;
         evento.preventDefault();
         const herramienta = herramientas.find(h => h.id === Number(boton.dataset.reservar || boton.dataset.detalle));
-        modalReservar(herramienta, () => { location.hash = '#/reservas'; }, {
+        modalReservar(herramienta, () => { location.hash = destino; }, {
             inicio: form.fechaInicio.value, fin: form.fechaFin.value,
             categoria: nombresCategorias.get(herramienta.categoriaId)?.nombre,
         });

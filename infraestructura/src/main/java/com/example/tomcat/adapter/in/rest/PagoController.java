@@ -40,13 +40,13 @@ public class PagoController {
     }
 
     @Operation(summary = "Pagar una reserva en línea",
-            description = "**Roles:** el CLIENTE que hizo la reserva o ADMIN. La reserva debe estar **ACEPTADA** y el monto "
+            description = "**Roles:** quien hizo la reserva (cliente o proveedor que alquila) o ADMIN. La reserva debe estar **ACEPTADA** y el monto "
                     + "debe ser exactamente `tarifaDiaria × días` (ambos extremos incluidos). En una sola operación: se registra "
                     + "el pago, la reserva pasa a **CONFIRMADA** (confirmación automática) y se genera la factura "
                     + "(`GET /api/facturas/pago/{pagoId}`). El cliente tiene 1 hora desde la aceptación para pagar.")
     @ApiResponse(responseCode = "201", description = "Pago registrado, reserva confirmada y factura generada")
     @ApiResponse(responseCode = "400", description = "El monto del pago debe ser 135000.00 según tarifa y días de alquiler.")
-    @ApiResponse(responseCode = "403", description = "Solo el cliente que hizo la reserva puede pagarla.")
+    @ApiResponse(responseCode = "403", description = "Solo quien hizo la reserva puede pagarla.")
     @ApiResponse(responseCode = "404", description = "La reserva no existe.")
     @ApiResponse(responseCode = "409", description = "La reserva ya tiene un pago completado.")
     @ResponseStatus(HttpStatus.CREATED)

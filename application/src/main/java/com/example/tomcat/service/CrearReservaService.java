@@ -47,6 +47,9 @@ public class CrearReservaService implements CrearReservaUseCase {
         if (!herramienta.estaDisponible()) {
             throw new DomainException("La herramienta no se encuentra disponible para renta.");
         }
+        if (clienteReserva.equals(herramienta.getProveedorId())) {
+            throw new DomainException("No puede reservar sus propias herramientas.");
+        }
 
         Reserva.validarFechas(fechaInicio, fechaFin, politica.hoy());
         if (reservaRepositoryPort.existeSolape(herramientaId, fechaInicio, fechaFin, null)) {
@@ -60,12 +63,13 @@ public class CrearReservaService implements CrearReservaUseCase {
     }
 
     private Long resolverCliente(Solicitante solicitante, Long clienteId) {
-        if (solicitante.esCliente()) {
-            // El cliente siempre reserva a su nombre, sin importar el clienteId enviado.
+        if (solicitante.puedeAlquilar()) {
+            // El cliente (o el proveedor que alquila equipos de otros) siempre reserva a su nombre,
+            // sin importar el clienteId enviado.
             return solicitante.id();
         }
         if (!solicitante.esAdmin()) {
-            throw new AccesoDenegadoException("Solo clientes o administradores pueden crear reservas.");
+            throw new AccesoDenegadoException("Solo clientes, proveedores o administradores pueden crear reservas.");
         }
         if (clienteId == null) {
             throw new DomainException("Debe indicar el clienteId para quien se crea la reserva.");

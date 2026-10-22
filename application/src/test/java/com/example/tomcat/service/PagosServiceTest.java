@@ -127,6 +127,22 @@ class PagosServiceTest {
         }
 
         @Test
+        @DisplayName("Un proveedor que alquiló una herramienta de otro paga su reserva y la factura sale a su nombre")
+        void proveedorComoCliente() {
+            Reserva reserva = existe(new Reserva(8L, OTRO_PROVEEDOR_ID, HERRAMIENTA_ID, HOY.plusDays(5), HOY.plusDays(7),
+                    "ACEPTADA", null, null, null, null, AHORA_UTC.minusMinutes(10), AHORA_UTC.minusMinutes(5)));
+            when(usuarios.buscarPorId(OTRO_PROVEEDOR_ID))
+                    .thenReturn(Optional.of(usuario(OTRO_PROVEEDOR_ID, "Maria Equipos", Rol.PROVEEDOR, true)));
+            ArgumentCaptor<Factura> factura = ArgumentCaptor.forClass(Factura.class);
+
+            procesar.procesar(OTRO_PROVEEDOR, 8L, MONTO, "EFECTIVO");
+
+            assertThat(reserva.getEstado()).isEqualTo("CONFIRMADA");
+            verify(facturas).guardar(factura.capture());
+            assertThat(factura.getValue().getClienteNombre()).isEqualTo("Maria Equipos");
+        }
+
+        @Test
         @DisplayName("No se paga dos veces, ni sin aceptación, ni fuera de plazo, ni con método inválido")
         void casosRechazados() {
             existe(reserva(7L, "ACEPTADA"));

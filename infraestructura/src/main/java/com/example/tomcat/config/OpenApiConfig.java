@@ -59,8 +59,8 @@ public class OpenApiConfig {
             ## Roles
             | Rol | Puede |
             |---|---|
-            | **ADMIN** | Todo: gestionar proveedores, clientes, categorías y herramientas, ver todas las reservas y pagos, reembolsar pagos, reportes e incidencias. |
-            | **PROVEEDOR** | Gestionar **sus** herramientas (con imágenes), aceptar o rechazar solicitudes, registrar entregas y devoluciones con daños, ver pagos y facturas de sus herramientas y gestionar sus mantenimientos. |
+            | **ADMIN** | Todo: gestionar proveedores, clientes, categorías y herramientas, ver todas las reservas y pagos, reembolsar pagos, reportes e incidencias. El **administrador principal** (admin@rentas.com) es el único que cambia roles (`PATCH /api/usuarios/{id}/rol`). |
+            | **PROVEEDOR** | Gestionar **sus** herramientas (con imágenes), aceptar o rechazar solicitudes, registrar entregas y devoluciones con daños, ver pagos y facturas de sus herramientas y gestionar sus mantenimientos. También puede **alquilar herramientas de otros proveedores** como un cliente. |
             | **CLIENTE** | Explorar el catálogo, reservar, modificar o cancelar sus reservas pendientes, pagar, descargar facturas y ver su historial. |
 
             Las reglas de propiedad se aplican siempre: nunca se confía en ids de cliente o proveedor enviados en la \

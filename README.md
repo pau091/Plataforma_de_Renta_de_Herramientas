@@ -8,7 +8,7 @@ devoluciones con daños y la rentabilidad de la plataforma.
 - **Base de datos:** MySQL 8 con migraciones Flyway, scripts SQL y datos de demostración (20 o más registros por entidad).
 - **Frontend:** HTML, CSS y JavaScript puro con Bootstrap 5, responsivo, con un panel distinto para cada rol.
 - **Despliegue:** WAR en **Apache Tomcat 11** (con Docker Compose o en un Tomcat instalado).
-- **Documentación y pruebas:** Swagger con ejemplos JSON, colección de Postman y 180 pruebas automatizadas.
+- **Documentación y pruebas:** Swagger con ejemplos JSON, colección de Postman y 190 pruebas automatizadas.
 
 ---
 
@@ -33,8 +33,8 @@ devoluciones con daños y la rentabilidad de la plataforma.
 
 | Rol | Puede |
 |---|---|
-| **Administrador** | Registrar, editar, desactivar y eliminar proveedores y clientes. Gestionar herramientas y categorías. Ver el historial de alquileres y el estado de los equipos. Atender incidencias (equipos dañados o perdidos). Supervisar pagos y facturación (corregir el método o reembolsar). Ver reportes de ingresos, rentabilidad, herramientas más alquiladas, clientes frecuentes y disponibilidad. |
-| **Proveedor** | Publicar, editar y eliminar sus herramientas con imagen, descripción, costo y estado. Aceptar o rechazar solicitudes de alquiler. Registrar entregas y confirmar devoluciones reportando daños. Gestionar mantenimientos. Consultar las facturas generadas por sus alquileres. |
+| **Administrador** | Registrar, editar, desactivar y eliminar proveedores y clientes. Gestionar herramientas y categorías. Ver el historial de alquileres y el estado de los equipos. Atender incidencias (equipos dañados o perdidos). Supervisar pagos y facturación (corregir el método o reembolsar). Ver reportes de ingresos, rentabilidad, herramientas más alquiladas, clientes frecuentes y disponibilidad. El **administrador principal** (`admin@rentas.com`) es el único que puede ascender o bajar de rango a los usuarios. |
+| **Proveedor** | Publicar, editar y eliminar sus herramientas con imagen, descripción, costo y estado. Aceptar o rechazar solicitudes de alquiler. Registrar entregas y confirmar devoluciones reportando daños. Gestionar mantenimientos. Consultar las facturas generadas por sus alquileres. También puede **alquilar herramientas de otros proveedores** como un cliente: reservar, pagar y descargar sus facturas (nunca sus propias herramientas). |
 | **Cliente** | Registrarse e iniciar sesión. Buscar herramientas por categoría, texto y disponibilidad en un rango de fechas. Reservar, cambiar las fechas o cancelar. Pagar en línea (confirmación automática). Descargar sus facturas y revisar su historial. |
 
 ---
@@ -370,6 +370,39 @@ Invoke-RestMethod -Uri http://localhost:8080/api/panel -Headers @{ Authorization
 **En Swagger:** inicie sesión con `POST /api/auth/login`, copie el `token`, pulse **Authorize**, pegue el token (sin la palabra
 `Bearer`) y confirme.
 
+### Cambiar el rol de un usuario (ascender o bajar de rango)
+
+Solo el **administrador principal** puede hacerlo. Es el usuario configurado en `app.admin-principal`
+(variable `APP_ADMIN_PRINCIPAL`, por defecto `admin@rentas.com`). No hay botón en la página: se hace por la API o Swagger.
+
+1. Inicie sesión como `admin@rentas.com` y autorice el token en Swagger.
+2. Busque el `id` del usuario con `GET /api/usuarios?rol=CLIENTE`, `?rol=PROVEEDOR` o `?rol=ADMIN`.
+3. Llame a `PATCH /api/usuarios/{id}/rol` con el nuevo rol:
+   ```json
+   { "rol": "PROVEEDOR" }
+   ```
+4. La API aplica el rol **de inmediato**, porque el filtro JWT lo lee de la base de datos en cada petición. Para ver el menú
+   del nuevo rol en la página, el usuario debe cerrar sesión y volver a entrar.
+
+Reglas:
+- Se puede ascender (CLIENTE → PROVEEDOR → ADMIN) y bajar de rango (por ejemplo, ADMIN → CLIENTE).
+- Los usuarios ascendidos a ADMIN administran la plataforma, pero **no** pueden cambiar roles.
+- Nadie puede cambiar el rol del administrador principal (`409`).
+- Un proveedor con herramientas registradas no puede pasar a CLIENTE, porque nadie gestionaría sus herramientas (`409`).
+  Sí puede ascender a ADMIN.
+- Si el usuario ya tiene ese rol, o el rol no es válido, responde `400`.
+
+### El proveedor también alquila
+
+Un proveedor puede reservar y pagar herramientas **de otros proveedores**, igual que un cliente. En la página tiene el grupo
+**"Como cliente"** en su menú: *Catálogo* (no muestra sus propias herramientas), *Mis alquileres* y *Mis pagos y facturas*.
+En la API:
+- reserva con `POST /api/reservas` y paga con `POST /api/pagos`;
+- consulta lo que alquiló con `GET /api/reservas?clienteId=<su id>` y `GET /api/facturas?clienteId=<su id>`;
+- sin ese filtro, sigue viendo las reservas y facturas de **sus** herramientas.
+
+Reservar una herramienta propia responde `400` ("No puede reservar sus propias herramientas").
+
 ### Permisos por rol
 
 | Recurso | Público | Cliente | Proveedor | Admin |
@@ -378,13 +411,14 @@ Invoke-RestMethod -Uri http://localhost:8080/api/panel -Headers @{ Authorization
 | Frontend, Swagger e imágenes (`/uploads/**`) | ✅ | | | |
 | Catálogo y categorías (consulta) | | ✅ | ✅ | ✅ |
 | Crear, editar y eliminar herramientas | | | ✅ las suyas | ✅ |
-| Crear, cambiar fechas y cancelar reservas | | ✅ las suyas | | ✅ |
+| Crear, cambiar fechas y cancelar reservas | | ✅ las suyas | ✅ las suyas (de herramientas de otros) | ✅ |
 | Aceptar, rechazar, entregar y recibir devoluciones | | | ✅ de sus herramientas | ✅ |
-| Pagar | | ✅ sus reservas | | ✅ |
+| Pagar | | ✅ sus reservas | ✅ sus reservas | ✅ |
 | Corregir o reembolsar pagos | | | | ✅ |
 | Facturas y pagos (consulta) | | ✅ los suyos | ✅ de sus herramientas | ✅ |
 | Mantenimientos | | | ✅ de sus herramientas | ✅ |
 | Usuarios, categorías (escritura) y reportes | | | | ✅ |
+| Cambiar el rol de un usuario | | | | ✅ solo el admin principal |
 | Panel (`/api/panel`) | | ✅ | ✅ | ✅ |
 
 ---
@@ -403,6 +437,7 @@ endpoint con su descripción, los roles permitidos, ejemplos JSON de petición y
 | POST | `/api/usuarios` | Registrar un proveedor o cliente | Admin |
 | GET | `/api/usuarios[?rol=]`, `/api/usuarios/clientes`, `/api/usuarios/proveedores` | Listar usuarios | Admin |
 | GET / PUT / DELETE | `/api/usuarios/{id}` | Consultar, editar o desactivar (`activo=false`), eliminar | Admin |
+| PATCH | `/api/usuarios/{id}/rol` | Ascender o bajar de rango (CLIENTE, PROVEEDOR, ADMIN) | Admin principal |
 | GET | `/api/categorias`, `/api/categorias/{id}` | Consultar categorías | Todos |
 | POST / PUT / DELETE | `/api/categorias[/{id}]` | Crear, editar, eliminar | Admin |
 | GET | `/api/herramientas[?categoriaId&disponibles&proveedorId&q]` | Catálogo con filtros combinables | Todos |
@@ -410,13 +445,13 @@ endpoint con su descripción, los roles permitidos, ejemplos JSON de petición y
 | POST / PUT / DELETE | `/api/herramientas[/{id}]` | Registrar, editar, eliminar | Proveedor dueño, Admin |
 | PATCH | `/api/herramientas/{id}/estado` | Cambiar disponibilidad | Proveedor dueño, Admin |
 | POST / PATCH | `/api/herramientas/{id}/imagen` | Subir archivo (multipart `archivo`) o asignar una URL | Proveedor dueño, Admin |
-| POST | `/api/reservas` | Reservar | Cliente, Admin |
+| POST | `/api/reservas` | Reservar | Cliente, Proveedor (herramientas de otros), Admin |
 | GET | `/api/reservas[?estado&clienteId&proveedorId&herramientaId]`, `/api/reservas/{id}` | Historial (filtrado según el rol) | Todos |
 | PUT / DELETE | `/api/reservas/{id}` | Cambiar fechas / cancelar | Cliente dueño, Admin |
 | POST | `/api/reservas/{id}/aceptar`, `/rechazar`, `/entregar`, `/devolver` | Gestionar la reserva | Proveedor dueño, Admin |
 | POST | `/api/reservas/vencer` | Ejecutar ya el vencimiento automático | Admin |
 | GET | `/api/reservas/disponibilidad?fechaInicio&fechaFin`, `/api/reservas/disponibilidad/{herramientaId}?...` | Disponibilidad por fechas | Todos |
-| POST | `/api/pagos` | Pagar (confirma la reserva y genera la factura) | Cliente dueño, Admin |
+| POST | `/api/pagos` | Pagar (confirma la reserva y genera la factura) | Quien hizo la reserva, Admin |
 | GET | `/api/pagos[?reservaId]`, `/api/pagos/{id}`, `/api/pagos/reserva/{id}` | Historial de pagos | Según el rol |
 | PUT / DELETE | `/api/pagos/{id}` | Corregir el método / reembolsar | Admin |
 | GET | `/api/facturas[?clienteId]`, `/{id}`, `/pago/{pagoId}`, `/reserva/{reservaId}` | Facturas | Según el rol |
@@ -614,8 +649,8 @@ En Windows PowerShell use `.\mvnw.cmd test` y `.\mvnw.cmd verify`.
 | Tipo | Ubicación | Cantidad | Qué cubre |
 |---|---|---|---|
 | Unitarias de dominio | `domain/src/test` | 76 | Ciclo de vida de la reserva, vencimiento, cancelación, devolución, pagos, facturas, herramientas y objetos de valor |
-| Unitarias de servicios | `application/src/test` | 52 | Reglas de negocio y de acceso por rol con Mockito y un reloj fijo (reservas, pagos, reembolsos, autenticación, reportes, imágenes) |
-| Integración | `infraestructura/src/test` (`*IT`) | 52 | La aplicación completa contra un **MySQL 8.4 real en Docker** (Testcontainers): migraciones, seguridad JWT y permisos, flujos completos por HTTP, concurrencia (peticiones simultáneas), imágenes (incluidas las fotos de demostración), CRUD y restricciones de la base |
+| Unitarias de servicios | `application/src/test` | 59 | Reglas de negocio y de acceso por rol con Mockito y un reloj fijo (reservas, pagos, reembolsos, cambio de rol, autenticación, reportes, imágenes) |
+| Integración | `infraestructura/src/test` (`*IT`) | 55 | La aplicación completa contra un **MySQL 8.4 real en Docker** (Testcontainers): migraciones, seguridad JWT y permisos, cambio de rol, proveedor que alquila, flujos completos por HTTP, concurrencia (peticiones simultáneas), imágenes (incluidas las fotos de demostración), CRUD y restricciones de la base |
 
 - Las pruebas de integración arrancan su propio MySQL temporal; no usan la base de Docker Compose.
 - Si Docker no está disponible, se **omiten** en lugar de fallar.

@@ -50,6 +50,9 @@ public class GestionarReservaService implements GestionarReservaUseCase {
                 throw new AccesoDenegadoException("Solo puede consultar sus propias reservas.");
             }
             reservas = reservaRepositoryPort.listarPorCliente(solicitante.id());
+        } else if (solicitante.esProveedor() && clienteId != null && solicitante.esUsuario(clienteId)) {
+            // El proveedor consulta las reservas que hizo como cliente (herramientas de otros proveedores).
+            reservas = reservaRepositoryPort.listarPorCliente(solicitante.id());
         } else if (solicitante.esProveedor()) {
             if (proveedorId != null && !solicitante.esUsuario(proveedorId)) {
                 throw new AccesoDenegadoException("Solo puede consultar las reservas de sus herramientas.");

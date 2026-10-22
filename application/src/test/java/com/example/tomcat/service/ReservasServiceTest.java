@@ -131,7 +131,7 @@ class ReservasServiceTest {
         }
 
         @Test
-        @DisplayName("El admin debe indicar un cliente válido; el proveedor no puede reservar")
+        @DisplayName("El admin debe indicar un cliente válido; el proveedor alquila a su nombre, pero no sus propias herramientas")
         void reglasPorRol() {
             assertThatThrownBy(() -> crear.crear(ADMIN, null, HERRAMIENTA_ID, HOY, HOY))
                     .isInstanceOf(DomainException.class).hasMessageContaining("clienteId");
@@ -139,7 +139,9 @@ class ReservasServiceTest {
             assertThatThrownBy(() -> crear.crear(ADMIN, PROVEEDOR_ID, HERRAMIENTA_ID, HOY, HOY))
                     .isInstanceOf(DomainException.class).hasMessageContaining("no es un cliente");
             assertThatThrownBy(() -> crear.crear(PROVEEDOR, CLIENTE_ID, HERRAMIENTA_ID, HOY, HOY))
-                    .isInstanceOf(AccesoDenegadoException.class);
+                    .isInstanceOf(DomainException.class).hasMessageContaining("propias herramientas");
+            Reserva comoCliente = crear.crear(OTRO_PROVEEDOR, CLIENTE_ID, HERRAMIENTA_ID, HOY, HOY);
+            assertThat(comoCliente.getClienteId()).isEqualTo(OTRO_PROVEEDOR_ID);
 
             when(usuarios.buscarPorId(CLIENTE_ID)).thenReturn(Optional.of(usuario(CLIENTE_ID, "Juan", Rol.CLIENTE, true)));
             assertThat(crear.crear(ADMIN, CLIENTE_ID, HERRAMIENTA_ID, HOY, HOY).getClienteId()).isEqualTo(CLIENTE_ID);

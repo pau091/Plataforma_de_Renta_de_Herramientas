@@ -76,7 +76,8 @@ function accionesReserva(reserva, rol) {
  * Lista de reservas con filtro por estado y las acciones que permite el rol.
  * nombresClientes: Map clienteId -> nombre (opcional).
  */
-export async function vistaReservas(contenedor, { rol, titulo, subtitulo, estadoInicial = '', nombresClientes }) {
+/** clienteId: solo las reservas hechas por ese usuario (el proveedor viendo lo que alquiló como cliente). */
+export async function vistaReservas(contenedor, { rol, titulo, subtitulo, estadoInicial = '', nombresClientes, clienteId }) {
     contenedor.innerHTML = encabezado(titulo, subtitulo, html`
         <select class="form-select" data-filtro-estado aria-label="Filtrar por estado" style="min-width: 200px">
             ${opciones([
@@ -98,7 +99,7 @@ export async function vistaReservas(contenedor, { rol, titulo, subtitulo, estado
         cargando(lista);
         try {
             const [listaHerramientas, listaReservas] = await Promise.all([
-                api.get('/herramientas'), api.get(conParametros('/reservas', { estado: filtro.value })),
+                api.get('/herramientas'), api.get(conParametros('/reservas', { estado: filtro.value, clienteId })),
             ]);
             herramientas = porId(listaHerramientas);
             reservas = listaReservas.sort((a, b) => b.id - a.id);
@@ -385,14 +386,14 @@ export function modalFactura(f) {
 
 // ================================================================ facturas
 
-export async function vistaFacturas(contenedor, { titulo, subtitulo }) {
+export async function vistaFacturas(contenedor, { titulo, subtitulo, clienteId }) {
     contenedor.innerHTML = encabezado(titulo, subtitulo);
     const lista = document.createElement('div');
     contenedor.appendChild(lista);
     cargando(lista);
     let facturas;
     try {
-        facturas = (await api.get('/facturas')).sort((a, b) => b.id - a.id);
+        facturas = (await api.get(conParametros('/facturas', { clienteId }))).sort((a, b) => b.id - a.id);
     } catch (error) {
         lista.innerHTML = '';
         return toastError(error);

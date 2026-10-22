@@ -33,7 +33,8 @@ public class FacturaController {
     }
 
     @Operation(summary = "Listar facturas",
-            description = "**Roles:** CLIENTE (las suyas), PROVEEDOR (las de sus herramientas) o ADMIN (todas, o las de un cliente).")
+            description = "**Roles:** CLIENTE (las suyas), PROVEEDOR (las de sus herramientas; con `clienteId=<su id>`, las de lo que él "
+                    + "alquiló) o ADMIN (todas, o las de un cliente).")
     @ApiResponse(responseCode = "200", description = "Facturas visibles para el usuario")
     @ApiResponse(responseCode = "403", description = "Solo puede consultar sus propias facturas.")
     @GetMapping

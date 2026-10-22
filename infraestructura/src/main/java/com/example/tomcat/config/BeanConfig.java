@@ -108,10 +108,12 @@ public class BeanConfig {
             UsuarioRepositoryPort usuarioRepository,
             HerramientaRepositoryPort herramientaRepository,
             ReservaRepositoryPort reservaRepository,
-            PasswordHasherPort passwordHasherPort
+            PasswordHasherPort passwordHasherPort,
+            @Value("${app.admin-principal}") String emailAdminPrincipal
     ) {
         return TransaccionalProxy.envolver(GestionarUsuarioUseCase.class,
-                new GestionarUsuarioService(usuarioRepository, herramientaRepository, reservaRepository, passwordHasherPort),
+                new GestionarUsuarioService(usuarioRepository, herramientaRepository, reservaRepository, passwordHasherPort,
+                        emailAdminPrincipal),
                 tx, ESCRITURA);
     }
 

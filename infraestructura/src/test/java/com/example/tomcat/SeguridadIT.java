@@ -102,7 +102,7 @@ class SeguridadIT extends IntegracionBase {
             "GET,    /api/mantenimientos,         carlos.proveedor@gmail.com, 200",
             "POST,   /api/herramientas,           juan.cliente@gmail.com,     403",
             "POST,   /api/categorias,             carlos.proveedor@gmail.com, 403",
-            "POST,   /api/pagos,                  carlos.proveedor@gmail.com, 403",
+            "POST,   /api/pagos,                  carlos.proveedor@gmail.com, 400",   // puede pagar lo que alquila; sin datos → 400
             "PUT,    /api/pagos/1,                juan.cliente@gmail.com,     403",
             "DELETE, /api/pagos/1,                carlos.proveedor@gmail.com, 403",
             "POST,   /api/reservas/vencer,        carlos.proveedor@gmail.com, 403",

@@ -20,6 +20,9 @@ const RUTAS = {
         { ruta: 'mantenimientos', texto: 'Mantenimientos', icono: 'wrench', vista: proveedor.mantenimientos, grupo: 'Inventario' },
         { ruta: 'reservas', texto: 'Reservas', icono: 'calendar-check', vista: proveedor.reservas, grupo: 'Alquileres' },
         { ruta: 'facturacion', texto: 'Facturación', icono: 'receipt', vista: proveedor.facturacion, grupo: 'Alquileres' },
+        { ruta: 'catalogo', texto: 'Catálogo', icono: 'search', vista: proveedor.catalogo, grupo: 'Como cliente' },
+        { ruta: 'mis-alquileres', texto: 'Mis alquileres', icono: 'bag-check', vista: proveedor.misAlquileres, grupo: 'Como cliente' },
+        { ruta: 'mis-facturas', texto: 'Mis pagos y facturas', icono: 'wallet2', vista: proveedor.misFacturas, grupo: 'Como cliente' },
     ],
     ADMIN: [
         { ruta: 'inicio', texto: 'Inicio', icono: 'house', vista: admin.inicio },

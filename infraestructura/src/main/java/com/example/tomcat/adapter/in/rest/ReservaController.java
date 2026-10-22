@@ -51,7 +51,8 @@ public class ReservaController {
 
     /** La reserva queda PENDIENTE hasta que el proveedor la acepte o la rechace. */
     @Operation(summary = "Reservar una herramienta",
-            description = "**Roles:** CLIENTE (la reserva queda a su nombre; `clienteId` se ignora) o ADMIN (debe indicar `clienteId`). "
+            description = "**Roles:** CLIENTE o PROVEEDOR (la reserva queda a su nombre; `clienteId` se ignora; un proveedor no puede reservar "
+                    + "sus propias herramientas) o ADMIN (debe indicar `clienteId`). "
                     + "Antes de crearla se valida que la herramienta esté DISPONIBLE, que la fecha de inicio no sea pasada y que "
                     + "no se cruce con otra reserva activa. Nace **PENDIENTE**: el proveedor tiene 1 hora para aceptarla.")
     @ApiResponse(responseCode = "201", description = "Reserva creada en estado PENDIENTE")
@@ -74,7 +75,8 @@ public class ReservaController {
     }
 
     @Operation(summary = "Historial de reservas",
-            description = "**Roles:** CLIENTE (sus reservas), PROVEEDOR (las de sus herramientas) o ADMIN (todas). "
+            description = "**Roles:** CLIENTE (sus reservas), PROVEEDOR (las de sus herramientas; con `clienteId=<su id>`, las que él "
+                    + "alquiló como cliente) o ADMIN (todas). "
                     + "Los filtros solo acotan dentro de lo que el rol puede ver.")
     @ApiResponse(responseCode = "200", description = "Reservas visibles para el usuario")
     @ApiResponse(responseCode = "400", description = "Estado de reserva no válido. Use uno de: ACEPTADA, CANCELADA, CONFIRMADA, ENTREGADA, FINALIZADA, PENDIENTE, RECHAZADA, VENCIDA.")
@@ -98,7 +100,7 @@ public class ReservaController {
     }
 
     @Operation(summary = "Consultar una reserva",
-            description = "**Roles:** el CLIENTE que la hizo, el PROVEEDOR de la herramienta o ADMIN.")
+            description = "**Roles:** quien la hizo (cliente o proveedor que alquila), el PROVEEDOR de la herramienta o ADMIN.")
     @ApiResponse(responseCode = "200", description = "Reserva encontrada")
     @ApiResponse(responseCode = "403", description = "No tiene permiso para acceder a esta reserva.")
     @ApiResponse(responseCode = "404", description = "La reserva no existe.")
@@ -110,7 +112,7 @@ public class ReservaController {
 
     /** Cambia las fechas de una reserva PENDIENTE (cliente que la hizo o ADMIN). */
     @Operation(summary = "Cambiar las fechas de una reserva",
-            description = "**Roles:** el CLIENTE que la hizo o ADMIN. Solo mientras está **PENDIENTE**; se repiten las "
+            description = "**Roles:** quien la hizo (cliente o proveedor que alquila) o ADMIN. Solo mientras está **PENDIENTE**; se repiten las "
                     + "validaciones de fechas y de disponibilidad. No reinicia el plazo de 1 hora.")
     @ApiResponse(responseCode = "200", description = "Fechas actualizadas")
     @ApiResponse(responseCode = "400", description = "Solo se pueden modificar las fechas de reservas pendientes.")
@@ -130,7 +132,7 @@ public class ReservaController {
      * No se borra: queda CANCELADA en el historial y libera las fechas.
      */
     @Operation(summary = "Cancelar una reserva",
-            description = "**Roles:** el CLIENTE que la hizo o ADMIN. Solo si está PENDIENTE o ACEPTADA sin pagar. "
+            description = "**Roles:** quien la hizo (cliente o proveedor que alquila) o ADMIN. Solo si está PENDIENTE o ACEPTADA sin pagar. "
                     + "No se borra: queda **CANCELADA** en el historial y libera las fechas. "
                     + "Una reserva ya pagada se cancela con el reembolso del pago (`DELETE /api/pagos/{id}`).")
     @ApiResponse(responseCode = "200", description = "Reserva cancelada")

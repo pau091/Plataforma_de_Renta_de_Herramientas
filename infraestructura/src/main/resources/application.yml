@@ -39,6 +39,8 @@ jwt:
   expiration-ms: 86400000
 
 app:
+  # Administrador principal: el único que puede ascender o bajar de rango a los usuarios (PATCH /api/usuarios/{id}/rol).
+  admin-principal: ${APP_ADMIN_PRINCIPAL:admin@rentas.com}
   # Zona horaria del negocio: define qué día es "hoy" para reservas y vencimientos.
   zona-horaria: ${APP_ZONA_HORARIA:America/Bogota}
   uploads:

@@ -1,5 +1,7 @@
 // Vistas del PROVEEDOR: panel con solicitudes, inventario, reservas, mantenimientos y facturación.
+// Además puede alquilar equipos de otros proveedores, como un cliente (catálogo, "Mis alquileres" y sus facturas).
 import { api } from '../api.js';
+import { catalogo as catalogoCliente } from './cliente.js';
 import { barrasPorEstado, cargando, diasAlquiler, fmtFecha, fmtMoneda, html, kpi, toastError, vacio } from '../ui.js';
 import {
     encabezado, manejarAccionReserva, porId, vistaFacturas, vistaInventario, vistaMantenimientos, vistaReservas,
@@ -71,6 +73,20 @@ export async function reservas(contenedor) {
 }
 
 export const mantenimientos = contenedor => vistaMantenimientos(contenedor, { admin: false });
+
+export const catalogo = (contenedor, usuario) => catalogoCliente(contenedor, usuario, {
+    destino: '#/mis-alquileres', excluirProveedorId: usuario.usuarioId,
+});
+
+export const misAlquileres = (contenedor, usuario) => vistaReservas(contenedor, {
+    rol: 'CLIENTE', clienteId: usuario.usuarioId, titulo: 'Mis alquileres',
+    subtitulo: 'Herramientas de otros proveedores que usted reservó. Pague las aceptadas antes de que venza el plazo.',
+});
+
+export const misFacturas = (contenedor, usuario) => vistaFacturas(contenedor, {
+    clienteId: usuario.usuarioId, titulo: 'Mis pagos y facturas',
+    subtitulo: 'Comprobantes de lo que usted alquiló como cliente.',
+});
 
 export const facturacion = contenedor => vistaFacturas(contenedor, {
     titulo: 'Facturación', subtitulo: 'Facturas y comprobantes generados automáticamente por los alquileres de sus herramientas.',

@@ -101,7 +101,9 @@ class FlujoAlquilerIT extends IntegracionBase {
         JsonNode sinFechas = esperar(POST("/api/reservas", CLIENTE, Map.of("herramientaId", herramienta)), 400);
         assertThat(sinFechas.get("errores").has("fechaInicio")).isTrue();
         esperar(POST("/api/reservas", CLIENTE, Map.of("herramientaId", 999999, "fechaInicio", dia(3), "fechaFin", dia(3))), 404);
-        esperar(POST("/api/reservas", PROVEEDOR, Map.of("herramientaId", herramienta, "fechaInicio", dia(20), "fechaFin", dia(20))), 403);
+        JsonNode propia = esperar(POST("/api/reservas", PROVEEDOR, Map.of("herramientaId", herramienta,
+                "fechaInicio", dia(20), "fechaFin", dia(20))), 400);
+        assertThat(propia.get("message").asText()).contains("propias herramientas");
 
         JsonNode libre = esperar(GET("/api/reservas/disponibilidad/" + herramienta + "?fechaInicio=" + dia(6) + "&fechaFin=" + dia(6), CLIENTE), 200);
         assertThat(libre.get("disponible").asBoolean()).isFalse();

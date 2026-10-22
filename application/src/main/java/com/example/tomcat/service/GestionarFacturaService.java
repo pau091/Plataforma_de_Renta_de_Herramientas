@@ -45,6 +45,10 @@ public class GestionarFacturaService implements GestionarFacturaUseCase {
             }
             return facturaRepositoryPort.listarPorCliente(solicitante.id());
         }
+        if (solicitante.esProveedor() && clienteId != null && solicitante.esUsuario(clienteId)) {
+            // Facturas de lo que el proveedor alquiló como cliente.
+            return facturaRepositoryPort.listarPorCliente(solicitante.id());
+        }
         if (solicitante.esProveedor()) {
             List<Factura> facturas = facturaRepositoryPort.listarPorHerramientas(
                     controlAcceso.idsHerramientasDelProveedor(solicitante.id()));

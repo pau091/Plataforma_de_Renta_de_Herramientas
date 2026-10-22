@@ -45,4 +45,8 @@ public class Usuario {
     public void desactivar() {
         this.activo = false;
     }
+
+    public void cambiarRol(Rol nuevoRol) {
+        this.rol = nuevoRol;
+    }
 }
