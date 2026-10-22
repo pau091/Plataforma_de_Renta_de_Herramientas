@@ -8,7 +8,7 @@ devoluciones con daños y la rentabilidad de la plataforma.
 - **Base de datos:** MySQL 8 con migraciones Flyway, scripts SQL y datos de demostración (20 o más registros por entidad).
 - **Frontend:** HTML, CSS y JavaScript puro con Bootstrap 5, responsivo, con un panel distinto para cada rol.
 - **Despliegue:** WAR en **Apache Tomcat 11** (con Docker Compose o en un Tomcat instalado).
-- **Documentación y pruebas:** Swagger con ejemplos JSON, colección de Postman y 175 pruebas automatizadas.
+- **Documentación y pruebas:** Swagger con ejemplos JSON, colección de Postman y 180 pruebas automatizadas.
 
 ---
 
@@ -80,7 +80,7 @@ infraestructura → Spring Boot: controllers REST, seguridad JWT, JPA, Flyway, c
 │   ├── java/.../adapter/out/            Entidades JPA, repositorios Spring Data, mappers, almacenamiento en disco
 │   ├── java/.../security/               Filtro JWT, configuración de Spring Security, errores 401/403 en JSON
 │   ├── java/.../config/                 Cableado de casos de uso, transacciones, CORS, Swagger, vencimiento programado
-│   ├── resources/db/migration/          Migraciones Flyway V1–V12
+│   ├── resources/db/migration/          Migraciones Flyway V1–V13
 │   └── resources/static/                Frontend (index.html, css/, js/, images/)
 ├── sql/                schema.sql y data.sql (creación y población de la base)
 ├── docs/               Diagrama relacional (imagen y fuente Mermaid)
@@ -301,7 +301,7 @@ La fuente editable del diagrama está en [`docs/diagrama-er.mmd`](docs/diagrama-
 |---|---|
 | [`sql/schema.sql`](sql/schema.sql) | Creación de la base y de las 9 tablas, con llaves, restricciones e índices |
 | [`sql/data.sql`](sql/data.sql) | Datos de demostración |
-| `infraestructura/src/main/resources/db/migration/V1…V12` | Las mismas definiciones como migraciones Flyway: la aplicación las aplica sola al arrancar |
+| `infraestructura/src/main/resources/db/migration/V1…V13` | Las mismas definiciones como migraciones Flyway: la aplicación las aplica sola al arrancar |
 
 Para crear la base a mano:
 
@@ -523,7 +523,21 @@ PENDIENTE ──(proveedor acepta)──► ACEPTADA ──(cliente paga: confir
 **Disponibilidad.** Antes de crear o aceptar una reserva se valida que:
 - la herramienta esté `DISPONIBLE`;
 - la fecha de inicio no sea pasada;
-- las fechas no se crucen con otra reserva activa (pendiente, aceptada, confirmada o entregada).
+- las fechas no se crucen con otra reserva activa (pendiente, aceptada, confirmada o entregada). Ambos extremos cuentan:
+  si la herramienta está reservada del 10 al 15, se rechaza cualquier rango que toque esos días (por ejemplo, del 15 al 20).
+
+**Concurrencia.** Cada herramienta es una sola unidad física, así que dos clientes no pueden quedarse con las mismas fechas
+aunque reserven en el mismo instante:
+- **Bloqueo pesimista:** al crear, aceptar o cambiar las fechas de una reserva se bloquea la fila de la herramienta
+  (`SELECT ... FOR UPDATE` con `@Lock(PESSIMISTIC_WRITE)`). Las peticiones simultáneas del mismo equipo se atienden de una
+  en una, y la segunda ya ve la reserva de la primera y recibe `409`. Lo mismo se hace con la reserva al pagarla, para que
+  dos pagos simultáneos no generen dos pagos ni dos facturas.
+- **Bloqueo optimista:** `reservas` tiene una columna `version` (`@Version`, migración V13). Si dos operaciones modifican
+  la misma reserva a la vez (por ejemplo, el cliente cancela mientras el proceso de vencimiento la vence), la segunda falla
+  con `409` en lugar de pisar el cambio.
+- Las transacciones de escritura usan aislamiento `READ COMMITTED`, para que la validación de cruce, después de esperar el
+  bloqueo, vea lo que la otra transacción acaba de confirmar.
+- `ConcurrenciaIT` lo comprueba con 8 peticiones simultáneas contra MySQL: solo una reserva y un pago quedan registrados.
 
 **Plazo y vencimiento.**
 - El proveedor tiene **1 hora** para aceptar una reserva y el cliente **1 hora** para pagarla.
@@ -595,8 +609,8 @@ En Windows PowerShell use `.\mvnw.cmd test` y `.\mvnw.cmd verify`.
 | Tipo | Ubicación | Cantidad | Qué cubre |
 |---|---|---|---|
 | Unitarias de dominio | `domain/src/test` | 76 | Ciclo de vida de la reserva, vencimiento, cancelación, devolución, pagos, facturas, herramientas y objetos de valor |
-| Unitarias de servicios | `application/src/test` | 51 | Reglas de negocio y de acceso por rol con Mockito y un reloj fijo (reservas, pagos, reembolsos, autenticación, reportes, imágenes) |
-| Integración | `infraestructura/src/test` (`*IT`) | 48 | La aplicación completa contra un **MySQL 8.4 real en Docker** (Testcontainers): migraciones, seguridad JWT y permisos, flujos completos por HTTP, imágenes (incluidas las fotos de demostración), CRUD y restricciones de la base |
+| Unitarias de servicios | `application/src/test` | 52 | Reglas de negocio y de acceso por rol con Mockito y un reloj fijo (reservas, pagos, reembolsos, autenticación, reportes, imágenes) |
+| Integración | `infraestructura/src/test` (`*IT`) | 52 | La aplicación completa contra un **MySQL 8.4 real en Docker** (Testcontainers): migraciones, seguridad JWT y permisos, flujos completos por HTTP, concurrencia (peticiones simultáneas), imágenes (incluidas las fotos de demostración), CRUD y restricciones de la base |
 
 - Las pruebas de integración arrancan su propio MySQL temporal; no usan la base de Docker Compose.
 - Si Docker no está disponible, se **omiten** en lugar de fallar.

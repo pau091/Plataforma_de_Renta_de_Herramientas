@@ -47,7 +47,15 @@ public class ReservaEntity {
     @Column(name = "fecha_aceptacion")
     private LocalDateTime fechaAceptacion;
 
+    /**
+     * Bloqueo optimista: cada UPDATE exige que la versión no haya cambiado desde que se leyó la reserva. Si otra
+     * transacción la modificó antes (dos pagos simultáneos, pago contra vencimiento...), falla en vez de pisarla.
+     */
+    @Version
+    private Long version;
+
     public Long getId() { return id; }
+    public Long getVersion() { return version; }
     public void setId(Long id) { this.id = id; }
     public Long getClienteId() { return clienteId; }
     public void setClienteId(Long clienteId) { this.clienteId = clienteId; }

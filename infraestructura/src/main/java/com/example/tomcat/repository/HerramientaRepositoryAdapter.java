@@ -56,6 +56,11 @@ public class HerramientaRepositoryAdapter implements HerramientaRepositoryPort {
     }
 
     @Override
+    public Optional<Herramienta> bloquearPorId(Long id) {
+        return repository.findByIdParaActualizar(id).map(mapper::toDomain);
+    }
+
+    @Override
     public boolean existePorCategoria(Long categoriaId) {
         return repository.existsByCategoriaId(categoriaId);
     }

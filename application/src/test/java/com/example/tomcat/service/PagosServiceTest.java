@@ -73,6 +73,7 @@ class PagosServiceTest {
 
     private Reserva existe(Reserva reserva) {
         when(reservas.buscarPorId(reserva.getId())).thenReturn(Optional.of(reserva));
+        when(reservas.bloquearPorId(reserva.getId())).thenReturn(Optional.of(reserva));
         return reserva;
     }
 

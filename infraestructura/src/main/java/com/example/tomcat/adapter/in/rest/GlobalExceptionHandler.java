@@ -9,6 +9,8 @@ import com.example.tomcat.exception.UsuarioInactivoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -123,6 +125,22 @@ public class GlobalExceptionHandler {
     }
 
     // ---------- Errores de base de datos y no previstos ----------
+
+    /** @Version: otra transacción modificó la misma reserva entre la lectura y la escritura (p. ej. dos pagos a la vez). */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, Object>> handleOptimisticLock(OptimisticLockingFailureException ex) {
+        log.info("Conflicto de concurrencia (bloqueo optimista): {}", ex.getMessage());
+        return respuesta(HttpStatus.CONFLICT,
+                "Otra operación modificó esta reserva al mismo tiempo. Consulte su estado actual e intente de nuevo.");
+    }
+
+    /** No se obtuvo el bloqueo de la fila (espera agotada o interbloqueo detectado por la base de datos). */
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, Object>> handlePessimisticLock(PessimisticLockingFailureException ex) {
+        log.warn("Conflicto de concurrencia (bloqueo pesimista)", ex);
+        return respuesta(HttpStatus.CONFLICT,
+                "Otra operación está modificando este registro en este momento. Intente de nuevo.");
+    }
 
     /** Respaldo por si una restricción de la base de datos (FK, UNIQUE) rechaza la operación. */
     @ExceptionHandler(DataIntegrityViolationException.class)

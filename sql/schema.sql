@@ -2,7 +2,7 @@
 -- Plataforma de Renta de Herramientas - Script de creación de la base de datos (MySQL 8)
 -- =====================================================================================================
 -- Esquema final equivalente al que construye Flyway al arrancar la aplicación con las migraciones
--- V1 a V12 (infraestructura/src/main/resources/db/migration). Úselo para crear la base a mano y luego
+-- V1 a V13 (infraestructura/src/main/resources/db/migration). Úselo para crear la base a mano y luego
 -- poblarla con sql/data.sql:
 --     mysql -u root -p < sql/schema.sql
 --     mysql -u root -p < sql/data.sql
@@ -94,6 +94,7 @@ CREATE TABLE reservas (
     fecha_devolucion         TIMESTAMP NULL,
     estado_devolucion        VARCHAR(50) NULL,
     observaciones_devolucion TEXT NULL,
+    version                  BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT fk_reservas_cliente FOREIGN KEY (cliente_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
     CONSTRAINT fk_reservas_herramienta FOREIGN KEY (herramienta_id) REFERENCES herramientas(id) ON DELETE RESTRICT,
     CONSTRAINT chk_reservas_fechas CHECK (fecha_fin >= fecha_inicio),

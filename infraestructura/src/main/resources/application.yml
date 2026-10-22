@@ -18,7 +18,7 @@ spring:
     # Si la base ya tiene tablas pero no historial de Flyway (creada a mano con sql/schema.sql y sql/data.sql),
     # se registra como esta versión y no se reaplican las migraciones. Actualizar al agregar migraciones nuevas.
     baseline-on-migrate: true
-    baseline-version: 12
+    baseline-version: 13
 
   servlet:
     multipart:

@@ -39,7 +39,9 @@ public class CrearReservaService implements CrearReservaUseCase {
     public Reserva crear(Solicitante solicitante, Long clienteId, Long herramientaId, LocalDate fechaInicio, LocalDate fechaFin) {
         Long clienteReserva = resolverCliente(solicitante, clienteId);
 
-        Herramienta herramienta = herramientaRepositoryPort.buscarPorId(herramientaId)
+        // Bloquea la herramienta: si otro cliente la está reservando en este instante, se espera a que termine
+        // y la validación de cruce de fechas ya ve su reserva.
+        Herramienta herramienta = herramientaRepositoryPort.bloquearPorId(herramientaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("La herramienta no existe."));
 
         if (!herramienta.estaDisponible()) {

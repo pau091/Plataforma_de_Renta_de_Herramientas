@@ -48,7 +48,8 @@ public class ProcesarPagoService implements ProcesarPagoUseCase {
 
     @Override
     public Pago procesar(Solicitante solicitante, Long reservaId, BigDecimal monto, String metodoPago) {
-        Reserva reserva = reservaRepositoryPort.buscarPorId(reservaId)
+        // Bloquea la reserva: un segundo pago simultáneo espera y luego ve que ya está pagada.
+        Reserva reserva = reservaRepositoryPort.bloquearPorId(reservaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("La reserva no existe."));
         if (!solicitante.esAdmin() && !(solicitante.esCliente() && solicitante.esUsuario(reserva.getClienteId()))) {
             throw new AccesoDenegadoException("Solo el cliente que hizo la reserva puede pagarla.");

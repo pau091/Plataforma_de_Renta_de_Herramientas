@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -35,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -67,6 +69,7 @@ class ReservasServiceTest {
         vencer = new VencerReservasService(reservas, pagos, POLITICA);
         taladro = herramienta("DISPONIBLE");
         when(herramientas.buscarPorId(HERRAMIENTA_ID)).thenReturn(Optional.of(taladro));
+        when(herramientas.bloquearPorId(HERRAMIENTA_ID)).thenReturn(Optional.of(taladro));
         when(reservas.guardar(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -108,11 +111,22 @@ class ReservasServiceTest {
         }
 
         @Test
+        @DisplayName("Concurrencia: bloquea la herramienta antes de validar el cruce de fechas y de guardar")
+        void bloqueaAntesDeValidarElCruce() {
+            crear.crear(CLIENTE, null, HERRAMIENTA_ID, HOY.plusDays(2), HOY.plusDays(4));
+
+            InOrder orden = inOrder(herramientas, reservas);
+            orden.verify(herramientas).bloquearPorId(HERRAMIENTA_ID);
+            orden.verify(reservas).existeSolape(HERRAMIENTA_ID, HOY.plusDays(2), HOY.plusDays(4), null);
+            orden.verify(reservas).guardar(any());
+        }
+
+        @Test
         @DisplayName("Rechaza fechas pasadas y herramientas inexistentes")
         void rechazaDatosInvalidos() {
             assertThatThrownBy(() -> crear.crear(CLIENTE, null, HERRAMIENTA_ID, HOY.minusDays(1), HOY))
                     .isInstanceOf(DomainException.class).hasMessageContaining("pasada");
-            when(herramientas.buscarPorId(404L)).thenReturn(Optional.empty());
+            when(herramientas.bloquearPorId(404L)).thenReturn(Optional.empty());
             assertThatThrownBy(() -> crear.crear(CLIENTE, null, 404L, HOY, HOY)).isInstanceOf(RecursoNoEncontradoException.class);
         }
 
@@ -237,6 +251,10 @@ class ReservasServiceTest {
             when(reservas.existeSolape(HERRAMIENTA_ID, HOY.plusDays(10), HOY.plusDays(12), 1L)).thenReturn(true);
             assertThatThrownBy(() -> gestionar.modificarFechas(CLIENTE, 1L, HOY.plusDays(10), HOY.plusDays(12)))
                     .isInstanceOf(ConflictoException.class);
+
+            InOrder orden = inOrder(herramientas, reservas);
+            orden.verify(herramientas).bloquearPorId(HERRAMIENTA_ID);
+            orden.verify(reservas).existeSolape(HERRAMIENTA_ID, HOY.plusDays(10), HOY.plusDays(12), 1L);
         }
 
         @Test

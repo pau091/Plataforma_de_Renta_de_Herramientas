@@ -91,7 +91,7 @@ public class GestionarReservaService implements GestionarReservaUseCase {
     @Override
     public Reserva aceptar(Solicitante solicitante, Long id) {
         Reserva reserva = buscarParaGestionar(solicitante, id);
-        Herramienta herramienta = herramientaRepositoryPort.buscarPorId(reserva.getHerramientaId())
+        Herramienta herramienta = herramientaRepositoryPort.bloquearPorId(reserva.getHerramientaId())
                 .orElseThrow(() -> new RecursoNoEncontradoException("La herramienta no existe."));
         if (!herramienta.estaDisponible()) {
             throw new DomainException("La herramienta no está operativa para aceptar la reserva.");
@@ -161,6 +161,7 @@ public class GestionarReservaService implements GestionarReservaUseCase {
             throw new ConflictoException("La reserva venció: el proveedor no la aceptó dentro del plazo. Cree una nueva.");
         }
         reserva.modificarFechas(fechaInicio, fechaFin, politica.hoy());
+        herramientaRepositoryPort.bloquearPorId(reserva.getHerramientaId());
         if (reservaRepositoryPort.existeSolape(reserva.getHerramientaId(), fechaInicio, fechaFin, reserva.getId())) {
             throw new ConflictoException("La herramienta ya tiene una reserva en esas fechas.");
         }

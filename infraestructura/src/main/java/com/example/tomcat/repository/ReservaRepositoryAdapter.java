@@ -44,6 +44,11 @@ public class ReservaRepositoryAdapter implements ReservaRepositoryPort {
     }
 
     @Override
+    public Optional<Reserva> bloquearPorId(Long id) {
+        return reservaRepository.findByIdParaActualizar(id).map(mapper::toDomain);
+    }
+
+    @Override
     public List<Reserva> listar() {
         return reservaRepository.findAll().stream().map(mapper::toDomain).toList();
     }

@@ -10,6 +10,8 @@ import java.util.Optional;
 public interface ReservaRepositoryPort {
     Reserva guardar(Reserva reserva);
     Optional<Reserva> buscarPorId(Long id);
+    /** Como buscarPorId, pero bloquea la reserva hasta que termine la transacción (dos pagos a la vez van en fila). */
+    Optional<Reserva> bloquearPorId(Long id);
     List<Reserva> listar();
     List<Reserva> listarPorCliente(Long clienteId);
     List<Reserva> listarPorProveedor(Long proveedorId);

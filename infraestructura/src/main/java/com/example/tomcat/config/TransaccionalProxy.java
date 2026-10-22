@@ -1,6 +1,7 @@
 package com.example.tomcat.config;
 
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.lang.reflect.InvocationTargetException;
@@ -22,6 +23,12 @@ public final class TransaccionalProxy {
                                  boolean soloLectura) {
         TransactionTemplate transaccion = new TransactionTemplate(transactionManager);
         transaccion.setReadOnly(soloLectura);
+        if (!soloLectura) {
+            // Cada consulta ve lo último confirmado (no una foto tomada al inicio de la transacción). Así, tras
+            // esperar el bloqueo de una herramienta, la validación de cruce de fechas ve la reserva que acaba de
+            // confirmar la otra transacción.
+            transaccion.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        }
 
         return (T) Proxy.newProxyInstance(
                 puerto.getClassLoader(),
