@@ -54,8 +54,13 @@ public class ReservaEntity {
     @Version
     private Long version;
 
+    @Embedded
+    private GarantiaEmbeddable garantia = new GarantiaEmbeddable();
+
     public Long getId() { return id; }
     public Long getVersion() { return version; }
+    public GarantiaEmbeddable getGarantia() { return garantia; }
+    public void setGarantia(GarantiaEmbeddable garantia) { this.garantia = garantia; }
     public void setId(Long id) { this.id = id; }
     public Long getClienteId() { return clienteId; }
     public void setClienteId(Long clienteId) { this.clienteId = clienteId; }

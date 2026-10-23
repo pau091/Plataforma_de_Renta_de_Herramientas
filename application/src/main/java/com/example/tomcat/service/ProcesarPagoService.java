@@ -62,18 +62,24 @@ public class ProcesarPagoService implements ProcesarPagoUseCase {
             throw new ConflictoException("La reserva venció: el plazo para pagarla era de "
                     + politica.getPlazoMaximo().toMinutes() + " minutos desde que el proveedor la aceptó.");
         }
-        // Confirmación automática: al pagar, la reserva ACEPTADA pasa a CONFIRMADA (si no está aceptada, falla aquí).
-        reserva.confirmarPago();
-
         Herramienta herramienta = herramientaRepositoryPort.buscarPorId(reserva.getHerramientaId())
                 .orElseThrow(() -> new RecursoNoEncontradoException("La herramienta no existe."));
         Usuario cliente = usuarioRepositoryPort.buscarPorId(reserva.getClienteId())
                 .orElseThrow(() -> new RecursoNoEncontradoException("El cliente no existe."));
 
-        BigDecimal esperado = herramienta.getTarifaDiaria().multiply(BigDecimal.valueOf(reserva.diasAlquiler()));
+        // Confirmación automática: al pagar, la reserva ACEPTADA pasa a CONFIRMADA (si no está aceptada, falla aquí)
+        // y el depósito de garantía queda retenido hasta la devolución.
+        BigDecimal deposito = herramienta.getDeposito();
+        reserva.confirmarPago(deposito);
+
+        BigDecimal alquiler = herramienta.getTarifaDiaria().multiply(BigDecimal.valueOf(reserva.diasAlquiler()));
+        BigDecimal esperado = alquiler.add(deposito);
         Dinero dinero = new Dinero(monto);
         if (dinero.getMonto().compareTo(esperado) != 0) {
-            throw new DomainException("El monto del pago debe ser " + esperado + " según tarifa y días de alquiler.");
+            throw new DomainException(deposito.signum() == 0
+                    ? "El monto del pago debe ser " + esperado + " según tarifa y días de alquiler."
+                    : "El monto del pago debe ser " + esperado + ": alquiler de " + alquiler
+                            + " (tarifa × días) más el depósito de garantía de " + deposito + ".");
         }
 
         String metodo = Pago.normalizarMetodo(metodoPago);
@@ -94,11 +100,12 @@ public class ProcesarPagoService implements ProcesarPagoUseCase {
                 reserva.getFechaFin(),
                 reserva.diasAlquiler(),
                 herramienta.getTarifaDiaria(),
-                esperado,
+                alquiler,
                 esperado,
                 metodo,
                 LocalDateTime.now(),
-                "VIGENTE"
+                "VIGENTE",
+                reserva.getGarantia()
         ));
         return pago;
     }

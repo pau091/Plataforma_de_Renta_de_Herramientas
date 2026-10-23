@@ -24,6 +24,8 @@ public class Factura {
     private String metodoPago;
     private LocalDateTime fechaEmision;
     private String estado; // VIGENTE, ANULADA
+    /** Copia del depósito cobrado y de su liquidación (multa por retraso, daños, lo devuelto y el saldo). */
+    private Garantia garantia;
 
     public Factura(Long id, String numero, Long pagoId, Long reservaId, Long clienteId, String clienteNombre,
                    String clienteEmail, Long herramientaId, String herramientaNombre, LocalDate fechaInicio,
@@ -47,6 +49,16 @@ public class Factura {
         this.metodoPago = metodoPago;
         this.fechaEmision = fechaEmision != null ? fechaEmision : LocalDateTime.now();
         this.estado = estado != null ? estado : "VIGENTE";
+        this.garantia = Garantia.sinCobrar();
+    }
+
+    public Factura(Long id, String numero, Long pagoId, Long reservaId, Long clienteId, String clienteNombre,
+                   String clienteEmail, Long herramientaId, String herramientaNombre, LocalDate fechaInicio,
+                   LocalDate fechaFin, long dias, BigDecimal tarifaDiaria, BigDecimal subtotal, BigDecimal total,
+                   String metodoPago, LocalDateTime fechaEmision, String estado, Garantia garantia) {
+        this(id, numero, pagoId, reservaId, clienteId, clienteNombre, clienteEmail, herramientaId, herramientaNombre,
+                fechaInicio, fechaFin, dias, tarifaDiaria, subtotal, total, metodoPago, fechaEmision, estado);
+        this.garantia = garantia != null ? garantia : Garantia.sinCobrar();
     }
 
     public Long getId() { return id; }
@@ -67,6 +79,7 @@ public class Factura {
     public String getMetodoPago() { return metodoPago; }
     public LocalDateTime getFechaEmision() { return fechaEmision; }
     public String getEstado() { return estado; }
+    public Garantia getGarantia() { return garantia; }
 
     public boolean estaAnulada() {
         return "ANULADA".equals(estado);
@@ -75,6 +88,11 @@ public class Factura {
     /** Refleja la corrección del método en el pago asociado. */
     public void cambiarMetodoPago(String metodoPago) {
         this.metodoPago = metodoPago;
+    }
+
+    /** La factura refleja la liquidación del depósito: multa por retraso, daños, lo devuelto y el saldo pendiente. */
+    public void registrarLiquidacion(Garantia liquidacion) {
+        this.garantia = liquidacion;
     }
 
     public void anular() {

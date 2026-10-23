@@ -1,5 +1,6 @@
 package com.example.tomcat.service;
 
+import com.example.tomcat.model.Garantia;
 import com.example.tomcat.model.Herramienta;
 import com.example.tomcat.model.Mantenimiento;
 import com.example.tomcat.model.Pago;
@@ -11,6 +12,7 @@ import com.example.tomcat.port.in.dto.ReporteDisponibilidad;
 import com.example.tomcat.port.in.dto.ReporteHerramientasMasAlquiladas;
 import com.example.tomcat.port.in.dto.ReporteIncidencias;
 import com.example.tomcat.port.in.dto.ReporteIngresos;
+import com.example.tomcat.port.in.dto.ReporteMultas;
 import com.example.tomcat.port.in.dto.ReporteRentabilidad;
 import com.example.tomcat.repository.HerramientaRepositoryPort;
 import com.example.tomcat.repository.MantenimientoRepositoryPort;
@@ -52,23 +54,79 @@ public class ConsultarReportesService implements ConsultarReportesUseCase {
         this.mantenimientoRepositoryPort = mantenimientoRepositoryPort;
     }
 
+    /**
+     * El pago incluye el depósito de garantía, que no es ingreso: se le devuelve al cliente. Solo cuenta como ingreso
+     * el alquiler, más la multa por retraso y los daños que se cobraron al liquidar el depósito.
+     */
     @Override
     public ReporteIngresos ingresos() {
         List<Pago> pagos = pagoRepositoryPort.listar().stream()
                 .filter(pago -> "COMPLETADO".equals(pago.getEstadoPago()))
                 .toList();
-        BigDecimal total = pagos.stream().map(Pago::getMonto).reduce(BigDecimal.ZERO, BigDecimal::add);
+        Map<Long, Reserva> reservas = reservasPorId();
+        List<Garantia> garantias = pagos.stream()
+                .map(pago -> garantia(reservas.get(pago.getReservaId())))
+                .toList();
+
+        BigDecimal alquiler = pagos.stream().map(pago -> alquilerCobrado(pago, reservas)).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal multas = sumar(garantias, Garantia::multaRetraso);
+        BigDecimal danos = sumar(garantias, Garantia::cargoDanos);
+        BigDecimal enCustodia = garantias.stream().filter(Garantia::enCustodia)
+                .map(Garantia::deposito).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal devueltos = sumar(garantias, Garantia::montoDevuelto);
+        BigDecimal saldo = sumar(garantias, Garantia::saldoPendiente);
+
         List<ReporteIngresos.IngresoPorMetodo> porMetodo = pagos.stream()
                 .collect(Collectors.groupingBy(Pago::getMetodoPago))
                 .entrySet().stream()
                 .map(entry -> new ReporteIngresos.IngresoPorMetodo(
                         entry.getKey(),
                         entry.getValue().size(),
-                        entry.getValue().stream().map(Pago::getMonto).reduce(BigDecimal.ZERO, BigDecimal::add)
+                        entry.getValue().stream().map(pago -> alquilerCobrado(pago, reservas)).reduce(BigDecimal.ZERO, BigDecimal::add)
                 ))
                 .sorted(Comparator.comparing(ReporteIngresos.IngresoPorMetodo::total).reversed())
                 .toList();
-        return new ReporteIngresos(total, pagos.size(), porMetodo);
+        return new ReporteIngresos(alquiler.add(multas).add(danos), pagos.size(), porMetodo,
+                alquiler, multas, danos, enCustodia, devueltos, saldo);
+    }
+
+    @Override
+    public ReporteMultas multas() {
+        Map<Long, Herramienta> herramientas = herramientaRepositoryPort.listar().stream()
+                .collect(Collectors.toMap(Herramienta::getId, Function.identity()));
+        Map<Long, Usuario> usuarios = usuariosPorId();
+        List<Reserva> reservas = reservaRepositoryPort.listar();
+
+        List<ReporteMultas.Multa> items = reservas.stream()
+                .filter(reserva -> reserva.getGarantia().diasRetraso() > 0)
+                .map(reserva -> {
+                    Garantia g = reserva.getGarantia();
+                    Herramienta herramienta = herramientas.get(reserva.getHerramientaId());
+                    Usuario cliente = usuarios.get(reserva.getClienteId());
+                    return new ReporteMultas.Multa(
+                            reserva.getId(),
+                            reserva.getHerramientaId(),
+                            herramienta == null ? null : herramienta.getNombre(),
+                            reserva.getClienteId(),
+                            cliente == null ? null : cliente.getNombre(),
+                            reserva.getFechaFin(),
+                            reserva.getFechaDevolucion(),
+                            g.diasRetraso(),
+                            g.multaRetraso(),
+                            g.deposito(),
+                            g.montoDevuelto(),
+                            g.saldoPendiente(),
+                            g.estado()
+                    );
+                })
+                .sorted(Comparator.comparing(ReporteMultas.Multa::fechaDevolucion,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+
+        BigDecimal totalMultas = items.stream().map(ReporteMultas.Multa::multa).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal saldo = reservas.stream().map(reserva -> reserva.getGarantia().saldoPendiente())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new ReporteMultas(items.size(), totalMultas, saldo, items);
     }
 
     @Override
@@ -234,13 +292,36 @@ public class ConsultarReportesService implements ConsultarReportesUseCase {
         return utilidad.multiply(BigDecimal.valueOf(100)).divide(ingresos, 2, RoundingMode.HALF_UP);
     }
 
+    /** Ingreso de cada reserva pagada: alquiler (sin el depósito) + multa por retraso + daños cobrados. */
     private Map<Long, BigDecimal> ingresosPorReserva() {
+        Map<Long, Reserva> reservas = reservasPorId();
         return pagoRepositoryPort.listar().stream()
                 .filter(pago -> "COMPLETADO".equals(pago.getEstadoPago()))
                 .collect(Collectors.groupingBy(
                         Pago::getReservaId,
-                        Collectors.reducing(BigDecimal.ZERO, Pago::getMonto, BigDecimal::add)
+                        Collectors.reducing(BigDecimal.ZERO, pago -> {
+                            Garantia g = garantia(reservas.get(pago.getReservaId()));
+                            return alquilerCobrado(pago, reservas).add(g.multaRetraso()).add(g.cargoDanos());
+                        }, BigDecimal::add)
                 ));
+    }
+
+    private Map<Long, Reserva> reservasPorId() {
+        return reservaRepositoryPort.listar().stream()
+                .collect(Collectors.toMap(Reserva::getId, Function.identity(), (a, b) -> a));
+    }
+
+    /** Parte del pago que corresponde al alquiler: el monto menos el depósito de garantía. */
+    private static BigDecimal alquilerCobrado(Pago pago, Map<Long, Reserva> reservas) {
+        return pago.getMonto().subtract(garantia(reservas.get(pago.getReservaId())).deposito());
+    }
+
+    private static Garantia garantia(Reserva reserva) {
+        return reserva == null ? Garantia.sinCobrar() : reserva.getGarantia();
+    }
+
+    private static BigDecimal sumar(List<Garantia> garantias, Function<Garantia, BigDecimal> campo) {
+        return garantias.stream().map(campo).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private BigDecimal ingresosPorHerramienta(Long herramientaId, List<Reserva> reservas, Map<Long, BigDecimal> ingresos) {

@@ -11,6 +11,9 @@ import com.example.tomcat.port.in.GestionarHerramientaUseCase;
 import com.example.tomcat.port.in.GestionarMantenimientoUseCase;
 import com.example.tomcat.port.in.GestionarPagoUseCase;
 import com.example.tomcat.port.in.GestionarReservaUseCase;
+import com.example.tomcat.port.in.CalificarUseCase;
+import com.example.tomcat.port.in.ListaEsperaUseCase;
+import com.example.tomcat.port.in.NotificacionesUseCase;
 import com.example.tomcat.port.in.GestionarUsuarioUseCase;
 import com.example.tomcat.port.in.ListarPagosUseCase;
 import com.example.tomcat.port.in.ProcesarPagoUseCase;
@@ -21,6 +24,9 @@ import com.example.tomcat.port.out.AlmacenamientoImagenPort;
 import com.example.tomcat.port.out.ListaNegraTokensPort;
 import com.example.tomcat.port.out.PasswordHasherPort;
 import com.example.tomcat.repository.CategoriaRepositoryPort;
+import com.example.tomcat.repository.CalificacionRepositoryPort;
+import com.example.tomcat.repository.ListaEsperaRepositoryPort;
+import com.example.tomcat.repository.NotificacionRepositoryPort;
 import com.example.tomcat.repository.FacturaRepositoryPort;
 import com.example.tomcat.repository.HerramientaRepositoryPort;
 import com.example.tomcat.repository.MantenimientoRepositoryPort;
@@ -39,6 +45,10 @@ import com.example.tomcat.service.GestionarHerramientaService;
 import com.example.tomcat.service.GestionarMantenimientoService;
 import com.example.tomcat.service.GestionarPagoService;
 import com.example.tomcat.service.GestionarReservaService;
+import com.example.tomcat.service.AvisoListaEspera;
+import com.example.tomcat.service.CalificarService;
+import com.example.tomcat.service.ListaEsperaService;
+import com.example.tomcat.service.NotificacionesService;
 import com.example.tomcat.service.GestionarUsuarioService;
 import com.example.tomcat.service.ListarPagosService;
 import com.example.tomcat.service.PoliticaVencimiento;
@@ -51,6 +61,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneId;
@@ -88,6 +99,33 @@ public class BeanConfig {
         return new ControlAcceso(herramientaRepository);
     }
 
+    /** Avisa al primero de la lista de espera cuando una reserva libera sus fechas (lo usan varios casos de uso). */
+    @Bean
+    public AvisoListaEspera avisoListaEspera(ListaEsperaRepositoryPort listaEsperaRepository,
+                                             NotificacionRepositoryPort notificacionRepository,
+                                             ReservaRepositoryPort reservaRepository,
+                                             HerramientaRepositoryPort herramientaRepository,
+                                             PoliticaVencimiento politicaVencimiento) {
+        return new AvisoListaEspera(listaEsperaRepository, notificacionRepository, reservaRepository, herramientaRepository,
+                politicaVencimiento);
+    }
+
+    @Bean
+    public ListaEsperaUseCase listaEsperaUseCase(ListaEsperaRepositoryPort listaEsperaRepository,
+                                                 HerramientaRepositoryPort herramientaRepository,
+                                                 ReservaRepositoryPort reservaRepository,
+                                                 PoliticaVencimiento politicaVencimiento) {
+        return TransaccionalProxy.envolver(ListaEsperaUseCase.class,
+                new ListaEsperaService(listaEsperaRepository, herramientaRepository, reservaRepository, politicaVencimiento),
+                tx, ESCRITURA);
+    }
+
+    @Bean
+    public NotificacionesUseCase notificacionesUseCase(NotificacionRepositoryPort notificacionRepository) {
+        return TransaccionalProxy.envolver(NotificacionesUseCase.class, new NotificacionesService(notificacionRepository),
+                tx, ESCRITURA);
+    }
+
     @Bean
     public RegistrarUsuarioUseCase registrarUsuarioUseCase(
             UsuarioRepositoryPort usuarioRepository,
@@ -123,6 +161,20 @@ public class BeanConfig {
     }
 
     @Bean
+    public CalificarUseCase calificarUseCase(
+            CalificacionRepositoryPort calificacionRepository,
+            ReservaRepositoryPort reservaRepository,
+            HerramientaRepositoryPort herramientaRepository,
+            UsuarioRepositoryPort usuarioRepository,
+            PoliticaVencimiento politicaVencimiento
+    ) {
+        return TransaccionalProxy.envolver(CalificarUseCase.class,
+                new CalificarService(calificacionRepository, reservaRepository, herramientaRepository, usuarioRepository,
+                        politicaVencimiento),
+                tx, ESCRITURA);
+    }
+
+    @Bean
     public SancionarUsuarioUseCase sancionarUsuarioUseCase(
             UsuarioRepositoryPort usuarioRepository,
             ListaNegraTokensPort listaNegraTokensPort,
@@ -153,10 +205,12 @@ public class BeanConfig {
             HerramientaRepositoryPort herramientaRepository,
             UsuarioRepositoryPort usuarioRepository,
             ReservaRepositoryPort reservaRepository,
-            PoliticaVencimiento politicaVencimiento
+            PoliticaVencimiento politicaVencimiento,
+            ListaEsperaRepositoryPort listaEsperaRepository
     ) {
         return TransaccionalProxy.envolver(CrearReservaUseCase.class,
-                new CrearReservaService(herramientaRepository, usuarioRepository, reservaRepository, politicaVencimiento),
+                new CrearReservaService(herramientaRepository, usuarioRepository, reservaRepository, politicaVencimiento,
+                        listaEsperaRepository),
                 tx, ESCRITURA);
     }
 
@@ -164,10 +218,11 @@ public class BeanConfig {
     public VencerReservasUseCase vencerReservasUseCase(
             ReservaRepositoryPort reservaRepository,
             PagoRepositoryPort pagoRepository,
-            PoliticaVencimiento politicaVencimiento
+            PoliticaVencimiento politicaVencimiento,
+            AvisoListaEspera avisoListaEspera
     ) {
         return TransaccionalProxy.envolver(VencerReservasUseCase.class,
-                new VencerReservasService(reservaRepository, pagoRepository, politicaVencimiento), tx, ESCRITURA);
+                new VencerReservasService(reservaRepository, pagoRepository, politicaVencimiento, avisoListaEspera), tx, ESCRITURA);
     }
 
     @Bean
@@ -200,11 +255,14 @@ public class BeanConfig {
             HerramientaRepositoryPort herramientaRepository,
             MantenimientoRepositoryPort mantenimientoRepository,
             ControlAcceso controlAcceso,
-            PoliticaVencimiento politicaVencimiento
+            PoliticaVencimiento politicaVencimiento,
+            FacturaRepositoryPort facturaRepository,
+            @Value("${app.reservas.recargo-mora}") BigDecimal recargoMora,
+            AvisoListaEspera avisoListaEspera
     ) {
         return TransaccionalProxy.envolver(GestionarReservaUseCase.class,
                 new GestionarReservaService(reservaRepository, herramientaRepository, mantenimientoRepository, controlAcceso,
-                        politicaVencimiento),
+                        politicaVencimiento, facturaRepository, recargoMora, avisoListaEspera),
                 tx, ESCRITURA);
     }
 
@@ -236,10 +294,11 @@ public class BeanConfig {
     public GestionarPagoUseCase gestionarPagoUseCase(
             PagoRepositoryPort pagoRepository,
             ReservaRepositoryPort reservaRepository,
-            FacturaRepositoryPort facturaRepository
+            FacturaRepositoryPort facturaRepository,
+            AvisoListaEspera avisoListaEspera
     ) {
         return TransaccionalProxy.envolver(GestionarPagoUseCase.class,
-                new GestionarPagoService(pagoRepository, reservaRepository, facturaRepository), tx, ESCRITURA);
+                new GestionarPagoService(pagoRepository, reservaRepository, facturaRepository, avisoListaEspera), tx, ESCRITURA);
     }
 
     @Bean
@@ -277,10 +336,12 @@ public class BeanConfig {
             MantenimientoRepositoryPort mantenimientoRepository,
             HerramientaRepositoryPort herramientaRepository,
             ReservaRepositoryPort reservaRepository,
-            ControlAcceso controlAcceso
+            ControlAcceso controlAcceso,
+            FacturaRepositoryPort facturaRepository
     ) {
         return TransaccionalProxy.envolver(GestionarMantenimientoUseCase.class,
-                new GestionarMantenimientoService(mantenimientoRepository, herramientaRepository, reservaRepository, controlAcceso),
+                new GestionarMantenimientoService(mantenimientoRepository, herramientaRepository, reservaRepository, controlAcceso,
+                        facturaRepository),
                 tx, ESCRITURA);
     }
 }

@@ -1,7 +1,7 @@
 // Componentes compartidos por los paneles: reservas y sus acciones, inventario, mantenimientos y facturas.
 import { api, conParametros, descargarFactura } from '../api.js';
 import {
-    abrirModal, badge, cargando, confirmar, diasAlquiler, fmtFecha, fmtHora, fmtInstante, fmtMoneda, hoyIso, html,
+    abrirModal, badge, cargando, confirmar, diasAlquiler, estrellas, fmtFecha, fmtHora, fmtInstante, fmtMoneda, hoyIso, html,
     imagenHerramienta, instante, opciones, raw, toast, toastError, vacio,
 } from '../ui.js';
 
@@ -35,6 +35,40 @@ function totalReserva(reserva, herramienta) {
     return herramienta ? herramienta.tarifaDiaria * diasAlquiler(reserva.fechaInicio, reserva.fechaFin) : null;
 }
 
+const ESTADOS_DEPOSITO = {
+    RETENIDO: ['Depósito retenido', 'secondary'], SIN_DEPOSITO: ['Sin depósito', 'light'],
+    PENDIENTE_REPARACION: ['Depósito: esperando costo de reparación', 'warning'], DEVUELTO: ['Depósito devuelto', 'success'],
+    DEVUELTO_PARCIAL: ['Depósito devuelto en parte', 'warning'], NO_DEVUELTO: ['Depósito no devuelto', 'danger'],
+    LIQUIDADO: ['Liquidado', 'light'], REEMBOLSADO: ['Depósito reembolsado', 'info'],
+};
+
+/** Días que pasaron desde la fecha fin (0 si aún no vence). */
+function diasDeRetraso(reserva) {
+    const hoy = new Date(`${hoyIso()}T00:00:00`);
+    const fin = new Date(`${reserva.fechaFin}T00:00:00`);
+    return Math.max(0, Math.round((hoy - fin) / 86400000));
+}
+
+/** Depósito, multa por retraso y saldo de la reserva, en pocas líneas. */
+function resumenGarantia(reserva) {
+    const g = reserva.garantia;
+    const partes = [];
+    if (reserva.estado === 'ENTREGADA' && diasDeRetraso(reserva) > 0) {
+        partes.push(html`<div class="small text-danger fw-semibold"><i aria-hidden="true" class="bi bi-alarm"></i>
+            Devolución atrasada ${diasDeRetraso(reserva)} día(s)</div>`);
+    }
+    if (g && g.estado && ESTADOS_DEPOSITO[g.estado] && (g.deposito > 0 || g.multaRetraso > 0 || g.saldoPendiente > 0)) {
+        const [texto, color] = ESTADOS_DEPOSITO[g.estado];
+        partes.push(html`<div class="small"><span class="badge text-bg-${color} border">${texto}</span>
+            ${g.deposito > 0 ? html`<span class="text-muted">${fmtMoneda(g.deposito)}</span>` : ''}</div>`);
+        if (g.multaRetraso > 0) {
+            partes.push(html`<div class="small text-danger">Multa por ${g.diasRetraso} día(s) de retraso: ${fmtMoneda(g.multaRetraso)}</div>`);
+        }
+        if (g.saldoPendiente > 0) partes.push(html`<div class="small text-danger">Saldo pendiente: ${fmtMoneda(g.saldoPendiente)}</div>`);
+    }
+    return html`${partes}`;
+}
+
 /** Aviso del plazo de 1 hora para las reservas que todavía pueden vencer. */
 function aviso(reserva) {
     const referencia = reserva.estado === 'PENDIENTE' ? reserva.fechaCreacion
@@ -47,7 +81,7 @@ function aviso(reserva) {
         : html`<div class="small text-muted"><i aria-hidden="true" class="bi bi-hourglass-bottom"></i> Plazo vencido</div>`;
 }
 
-function accionesReserva(reserva, rol) {
+function accionesReserva(reserva, rol, calificadas) {
     const boton = (accion, texto, icono, color = 'outline-secondary') =>
         html`<button class="btn btn-sm btn-${color}" data-accion="${accion}" data-id="${reserva.id}" title="${texto}">
             <i aria-hidden="true" class="bi bi-${icono}"></i><span class="d-inline d-md-none d-xl-inline ms-1">${texto}</span></button>`;
@@ -69,6 +103,12 @@ function accionesReserva(reserva, rol) {
         botones.push(boton('cancelar', 'Cancelar', 'trash', 'outline-danger'));
     }
     if (['CONFIRMADA', 'ENTREGADA', 'FINALIZADA'].includes(e)) botones.push(factura);
+    if (rol === 'CLIENTE' && e === 'FINALIZADA' && calificadas) {
+        const resena = calificadas.get(reserva.id);
+        botones.push(resena
+            ? html`<span class="small text-muted align-self-center" title="Su reseña">${estrellas(resena.estrellasHerramienta || resena.estrellasProveedor, 1)}</span>`
+            : boton('calificar', 'Calificar', 'star', 'warning'));
+    }
     return html`<div class="d-flex flex-wrap gap-1 justify-content-end">${botones}</div>`;
 }
 
@@ -94,14 +134,17 @@ export async function vistaReservas(contenedor, { rol, titulo, subtitulo, estado
     const filtro = contenedor.querySelector('[data-filtro-estado]');
     let herramientas = new Map();
     let reservas = [];
+    let calificadas = null;
 
     async function recargar() {
         cargando(lista);
         try {
-            const [listaHerramientas, listaReservas] = await Promise.all([
+            const [listaHerramientas, listaReservas, misResenas] = await Promise.all([
                 api.get('/herramientas'), api.get(conParametros('/reservas', { estado: filtro.value, clienteId })),
+                rol === 'CLIENTE' ? api.get('/calificaciones/mias') : Promise.resolve(null),
             ]);
             herramientas = porId(listaHerramientas);
+            calificadas = misResenas && new Map(misResenas.map(c => [c.reservaId, c]));
             reservas = listaReservas.sort((a, b) => b.id - a.id);
             pintar();
         } catch (error) {
@@ -132,8 +175,8 @@ export async function vistaReservas(contenedor, { rol, titulo, subtitulo, estado
                         <td class="text-nowrap" data-label="Fechas"><div>${fmtFecha(r.fechaInicio)} → ${fmtFecha(r.fechaFin)}
                             <div class="small text-muted">${diasAlquiler(r.fechaInicio, r.fechaFin)} día(s)</div></div></td>
                         <td class="text-end text-nowrap" data-label="Total"><div>${fmtMoneda(totalReserva(r, h))}</div></td>
-                        <td data-label="Estado"><div>${badge(r.estado)}${aviso(r)}</div></td>
-                        <td data-label=""><div class="w-100">${accionesReserva(r, rol)}</div></td></tr>`;
+                        <td data-label="Estado"><div>${badge(r.estado)}${aviso(r)}${resumenGarantia(r)}</div></td>
+                        <td data-label=""><div class="w-100">${accionesReserva(r, rol, calificadas)}</div></td></tr>`;
                 })}</tbody></table></div></div>`;
     }
 
@@ -175,11 +218,13 @@ export async function manejarAccionReserva(accion, reserva, herramientas, recarg
             }
             return;
         case 'devolver':
-            return modalDevolucion(reserva, recargar);
+            return modalDevolucion(reserva, herramientas.get(reserva.herramientaId), recargar);
         case 'modificar':
             return modalFechas(reserva, herramientas.get(reserva.herramientaId), recargar);
         case 'pagar':
             return modalPago(reserva, herramientas.get(reserva.herramientaId), recargar);
+        case 'calificar':
+            return modalCalificar(reserva, herramientas.get(reserva.herramientaId), recargar);
         case 'factura':
             try {
                 return modalFactura(await api.get(`/facturas/reserva/${id}`));
@@ -201,15 +246,19 @@ function camposFechas(inicio = '', fin = '') {
     <div class="alert alert-light border mt-3 mb-0" data-resumen></div>`;
 }
 
-/** Recalcula días y total mientras el usuario cambia las fechas. */
-function enlazarResumen(form, tarifa) {
+/** Recalcula días y total mientras el usuario cambia las fechas (alquiler + depósito de garantía, si lo hay). */
+function enlazarResumen(form, tarifa, deposito = 0) {
     const resumen = form.querySelector('[data-resumen]');
     const actualizar = () => {
         const dias = diasAlquiler(form.fechaInicio.value, form.fechaFin.value);
         form.fechaFin.min = form.fechaInicio.value || hoyIso();
         resumen.innerHTML = dias > 0
             ? html`<div class="d-flex justify-content-between"><span>${dias} día(s) × ${fmtMoneda(tarifa)}</span>
-                <strong>${fmtMoneda(dias * tarifa)}</strong></div>`
+                <strong>${fmtMoneda(dias * tarifa)}</strong></div>
+                ${deposito > 0 ? html`<div class="d-flex justify-content-between small text-muted"><span>+ Depósito de garantía (reembolsable)</span>
+                    <span>${fmtMoneda(deposito)}</span></div>
+                <div class="d-flex justify-content-between border-top mt-1 pt-1"><span>A pagar al confirmar</span>
+                    <strong>${fmtMoneda(dias * tarifa + deposito)}</strong></div>` : ''}`
             : html`<span class="text-muted">Seleccione un rango de fechas válido.</span>`;
     };
     form.addEventListener('input', actualizar);
@@ -226,7 +275,9 @@ function validarRango(datos) {
  * Ficha ampliada de una herramienta (CLIENTE): foto grande, descripción, precio y reserva por fechas.
  * Mientras se eligen las fechas consulta la disponibilidad real y calcula el total.
  */
-export function modalReservar(herramienta, alTerminar, { inicio = '', fin = '', categoria = '' } = {}) {
+export function modalReservar(herramienta, alTerminar, { inicio = '', fin = '', categoria = '', resumen } = {}) {
+    const deHerramienta = resumen?.herramientas?.find(p => p.id === herramienta.id);
+    const delProveedor = resumen?.proveedores?.find(p => p.id === herramienta.proveedorId);
     const disponible = herramienta.estado === 'DISPONIBLE';
     const nodo = abrirModal({
         titulo: 'Detalle de la herramienta',
@@ -239,10 +290,16 @@ export function modalReservar(herramienta, alTerminar, { inicio = '', fin = '', 
                 <div class="d-flex flex-wrap gap-2 mb-2">
                     ${categoria ? html`<span class="badge rounded-pill text-bg-light border"><i aria-hidden="true" class="bi bi-tag me-1"></i>${categoria}</span>` : ''}
                     ${badge(herramienta.estado)}</div>
-                <h3 class="h4 fw-bold mb-2">${herramienta.nombre}</h3>
+                <h3 class="h4 fw-bold mb-1">${herramienta.nombre}</h3>
+                <div class="mb-2">${estrellas(deHerramienta?.promedio, deHerramienta?.total)}
+                    ${delProveedor ? html`<span class="small text-muted ms-2">· Proveedor ${estrellas(delProveedor.promedio, delProveedor.total)}</span>` : ''}</div>
                 <p class="text-secondary">${herramienta.descripcion || 'Sin descripción.'}</p>
-                <div class="precio-detalle mb-3"><span class="fs-3 fw-bold">${fmtMoneda(herramienta.tarifaDiaria)}</span>
+                <div class="precio-detalle mb-1"><span class="fs-3 fw-bold">${fmtMoneda(herramienta.tarifaDiaria)}</span>
                     <span class="text-secondary"> / día</span></div>
+                ${herramienta.deposito > 0 ? html`<p class="small text-secondary mb-3"><i aria-hidden="true" class="bi bi-shield-lock me-1"></i>
+                    Depósito de garantía: <strong>${fmtMoneda(herramienta.deposito)}</strong>. Se paga con el alquiler y se devuelve al
+                    entregar la herramienta a tiempo y en buen estado; si hay retraso se descuenta una multa por cada día, y si hay
+                    daños, el costo de la reparación.</p>` : html`<div class="mb-3"></div>`}
                 ${disponible ? html`
                     <div class="border rounded-3 p-3 bg-light-subtle">
                         <div class="fw-semibold mb-2"><i aria-hidden="true" class="bi bi-calendar-range me-1"></i>Elige las fechas del alquiler</div>
@@ -254,10 +311,12 @@ export function modalReservar(herramienta, alTerminar, { inicio = '', fin = '', 
                         minutos para pagarla y confirmar el alquiler.</p>`
                     : html`<div class="alert alert-warning mb-0"><i aria-hidden="true" class="bi bi-exclamation-triangle me-1"></i>
                         Esta herramienta no está disponible para reservar en este momento.</div>`}
+                <div class="mt-3" data-resenas></div>
             </div></div>`,
         alAbrir: form => {
+            pintarResenas(form.querySelector('[data-resenas]'), herramienta.id);
             if (!disponible) return;
-            enlazarResumen(form, herramienta.tarifaDiaria);
+            enlazarResumen(form, herramienta.tarifaDiaria, herramienta.deposito || 0);
             const indicador = form.querySelector('[data-disponibilidad]');
             let consulta = 0;
             const revisar = async () => {
@@ -272,12 +331,28 @@ export function modalReservar(herramienta, alTerminar, { inicio = '', fin = '', 
                     if (actual !== consulta) return; // llegó una respuesta vieja
                     indicador.innerHTML = r.disponible
                         ? html`<span class="text-success"><i aria-hidden="true" class="bi bi-check-circle-fill me-1"></i>Disponible en esas fechas</span>`
-                        : html`<span class="text-danger"><i aria-hidden="true" class="bi bi-x-circle-fill me-1"></i>Ya está reservada en esas fechas</span>`;
+                        : html`<span class="text-danger"><i aria-hidden="true" class="bi bi-x-circle-fill me-1"></i>Ya está reservada en esas fechas.</span>
+                            <button type="button" class="btn btn-sm btn-outline-dark ms-1 mt-1" data-espera>
+                                <i aria-hidden="true" class="bi bi-hourglass-split me-1"></i>Anotarme en la lista de espera</button>
+                            <div class="text-muted mt-1">Si la reserva que ocupa esas fechas se cancela o vence, le avisaremos.</div>`;
                 } catch {
                     indicador.innerHTML = '';
                 }
             };
             form.addEventListener('change', revisar);
+            form.addEventListener('click', async evento => {
+                const boton = evento.target.closest('[data-espera]');
+                if (!boton) return;
+                boton.disabled = true;
+                try {
+                    await api.post('/lista-espera', { herramientaId: herramienta.id, fechaInicio: form.fechaInicio.value, fechaFin: form.fechaFin.value });
+                    boton.outerHTML = html`<span class="badge text-bg-success mt-1"><i aria-hidden="true" class="bi bi-check-lg me-1"></i>Anotado en la lista de espera</span>`;
+                    toast('Quedó en la lista de espera. Le avisaremos en la campana si esas fechas se liberan.');
+                } catch (error) {
+                    boton.disabled = false;
+                    toastError(error);
+                }
+            });
             revisar();
         },
         alConfirmar: async (form, datos) => {
@@ -290,6 +365,49 @@ export function modalReservar(herramienta, alTerminar, { inicio = '', fin = '', 
         },
     });
     return nodo;
+}
+
+/** Reseña de un alquiler terminado: estrellas para la herramienta y para el proveedor (al menos una) y un comentario. */
+function modalCalificar(reserva, herramienta, recargar) {
+    const selector = (nombre, titulo) => html`<fieldset class="mb-3"><legend class="form-label fs-6">${titulo}</legend>
+        <div class="d-flex flex-wrap gap-2">${[1, 2, 3, 4, 5].map(n => html`
+            <input type="radio" class="btn-check" name="${nombre}" id="${nombre}-${n}" value="${n}">
+            <label class="btn btn-outline-warning" for="${nombre}-${n}">${n} <i aria-hidden="true" class="bi bi-star-fill"></i></label>`)}</div></fieldset>`;
+    abrirModal({
+        titulo: `Calificar ${herramienta ? herramienta.nombre : `la reserva #${reserva.id}`}`,
+        textoConfirmar: 'Publicar reseña',
+        cuerpo: html`${selector('estrellasHerramienta', '¿Qué tal la herramienta?')}
+            ${selector('estrellasProveedor', '¿Y la atención del proveedor?')}
+            <label class="form-label" for="cal-comentario">Comentario (opcional)</label>
+            <textarea class="form-control" id="cal-comentario" name="comentario" rows="3" maxlength="500"
+                placeholder="Cuéntele a otros clientes cómo le fue"></textarea>
+            <div class="form-text">Solo puede calificar una vez cada alquiler.</div>`,
+        alConfirmar: async (form, datos) => {
+            if (!datos.estrellasHerramienta && !datos.estrellasProveedor) {
+                throw new Error('Elija las estrellas de la herramienta, del proveedor o de ambos.');
+            }
+            await api.post(`/reservas/${reserva.id}/calificacion`, {
+                estrellasHerramienta: datos.estrellasHerramienta ? Number(datos.estrellasHerramienta) : null,
+                estrellasProveedor: datos.estrellasProveedor ? Number(datos.estrellasProveedor) : null,
+                comentario: datos.comentario?.trim() || null,
+            });
+            toast('¡Gracias por su reseña!');
+            await recargar();
+        },
+    });
+}
+
+/** Últimas reseñas de la herramienta, dentro de la ficha. */
+async function pintarResenas(contenedor, herramientaId) {
+    try {
+        const resenas = (await api.get(`/herramientas/${herramientaId}/calificaciones`)).slice(0, 3);
+        contenedor.innerHTML = resenas.length ? html`<div class="fw-semibold small mb-1">Lo que dicen otros clientes</div>
+            ${resenas.map(r => html`<div class="border-start border-3 border-warning ps-2 mb-2">
+                <div class="small">${estrellas(r.estrellasHerramienta || r.estrellasProveedor, 1)} <span class="text-muted">· ${r.clienteNombre || 'Cliente'}</span></div>
+                ${r.comentario ? html`<div class="small text-secondary">${r.comentario}</div>` : ''}</div>`)}` : '';
+    } catch {
+        contenedor.innerHTML = '';
+    }
 }
 
 function modalFechas(reserva, herramienta, recargar) {
@@ -308,7 +426,9 @@ function modalFechas(reserva, herramienta, recargar) {
 
 function modalPago(reserva, herramienta, recargar) {
     const dias = diasAlquiler(reserva.fechaInicio, reserva.fechaFin);
-    const monto = herramienta.tarifaDiaria * dias;
+    const alquiler = herramienta.tarifaDiaria * dias;
+    const deposito = herramienta.deposito || 0;
+    const monto = alquiler + deposito;
     abrirModal({
         titulo: `Pagar la reserva #${reserva.id}`,
         textoConfirmar: `Pagar ${fmtMoneda(monto)}`,
@@ -318,6 +438,10 @@ function modalPago(reserva, herramienta, recargar) {
                 <li class="list-group-item d-flex justify-content-between"><span>Periodo</span>
                     <span>${fmtFecha(reserva.fechaInicio)} → ${fmtFecha(reserva.fechaFin)} (${dias} día(s))</span></li>
                 <li class="list-group-item d-flex justify-content-between"><span>Tarifa diaria</span><span>${fmtMoneda(herramienta.tarifaDiaria)}</span></li>
+                <li class="list-group-item d-flex justify-content-between"><span>Alquiler</span><span>${fmtMoneda(alquiler)}</span></li>
+                ${deposito > 0 ? html`<li class="list-group-item d-flex justify-content-between"><span>Depósito de garantía
+                    <div class="small text-muted">Se le devuelve al entregar a tiempo y en buen estado.</div></span>
+                    <span>${fmtMoneda(deposito)}</span></li>` : ''}
                 <li class="list-group-item d-flex justify-content-between fs-5"><span>Total</span><strong>${fmtMoneda(monto)}</strong></li></ul>
             <label class="form-label" for="p-metodo">Método de pago</label>
             <select class="form-select" id="p-metodo" name="metodoPago" required>
@@ -336,25 +460,37 @@ function modalPago(reserva, herramienta, recargar) {
     });
 }
 
-function modalDevolucion(reserva, recargar) {
+function modalDevolucion(reserva, herramienta, recargar) {
+    const atraso = diasDeRetraso(reserva);
+    const deposito = reserva.garantia?.deposito || 0;
     const opcion = (valor, texto, ayuda, marcado = false) => html`<div class="form-check mb-2">
         <input class="form-check-input" type="radio" name="estadoEquipo" id="dev-${valor}" value="${valor}" ${marcado ? raw('checked') : ''} required>
         <label class="form-check-label" for="dev-${valor}"><strong>${texto}</strong><div class="small text-muted">${ayuda}</div></label></div>`;
     abrirModal({
         titulo: `Devolución de la reserva #${reserva.id}`,
         textoConfirmar: 'Registrar devolución',
-        cuerpo: html`<p class="mb-2">¿En qué estado se recibió la herramienta?</p>
+        cuerpo: html`${atraso > 0 ? html`<div class="alert alert-danger small"><i aria-hidden="true" class="bi bi-alarm me-1"></i>
+                Debía devolverse el ${fmtFecha(reserva.fechaFin)}: <strong>${atraso} día(s) de retraso</strong>. Se cobrará una multa por
+                cada día (la tarifa${herramienta ? html` de ${fmtMoneda(herramienta.tarifaDiaria)}` : ''} más un recargo), descontada del depósito.</div>` : ''}
+            ${deposito > 0 ? html`<p class="small text-muted mb-2"><i aria-hidden="true" class="bi bi-shield-lock me-1"></i>Depósito retenido:
+                ${fmtMoneda(deposito)}. Si está dañada, el costo de la reparación se descontará al cerrar el mantenimiento.</p>` : ''}
+            <p class="mb-2">¿En qué estado se recibió la herramienta?</p>
             ${opcion('BUENO', 'Buen estado', 'La herramienta queda disponible para nuevos alquileres.', true)}
             ${opcion('DANADO', 'Dañada', 'Pasa a mantenimiento y se abre un reporte de daño.')}
-            ${opcion('PERDIDO', 'Perdida', 'Queda fuera de servicio.')}
+            ${opcion('PERDIDO', 'Perdida', 'Queda fuera de servicio y el depósito no se devuelve.')}
             <label class="form-label mt-2" for="dev-obs">Observaciones</label>
             <textarea class="form-control" id="dev-obs" name="observaciones" rows="3" maxlength="1000"
                 placeholder="Describa el daño o la situación"></textarea>`,
         alConfirmar: async (form, datos) => {
-            await api.post(`/reservas/${reserva.id}/devolver`, datos);
+            const finalizada = await api.post(`/reservas/${reserva.id}/devolver`, datos);
+            const g = finalizada.garantia || {};
             const extra = datos.estadoEquipo === 'DANADO' ? ' Se abrió un mantenimiento por el daño.'
                 : datos.estadoEquipo === 'PERDIDO' ? ' La herramienta quedó fuera de servicio.' : '';
-            toast(`Devolución registrada; la reserva quedó finalizada.${extra}`);
+            const multa = g.multaRetraso > 0 ? ` Multa por ${g.diasRetraso} día(s) de retraso: ${fmtMoneda(g.multaRetraso)}.` : '';
+            const devuelto = g.estado === 'PENDIENTE_REPARACION' ? ' El depósito se liquidará al cerrar la reparación.'
+                : g.deposito > 0 ? ` Se devuelven ${fmtMoneda(g.montoDevuelto)} del depósito.` : '';
+            const saldo = g.saldoPendiente > 0 ? ` Saldo pendiente del cliente: ${fmtMoneda(g.saldoPendiente)}.` : '';
+            toast(`Devolución registrada; la reserva quedó finalizada.${extra}${multa}${devuelto}${saldo}`, g.multaRetraso > 0 ? 'warning' : 'success');
             await recargar();
         },
     });
@@ -377,11 +513,77 @@ export function modalFactura(f) {
                 <tbody><tr><td>${f.herramientaNombre}</td><td>${fmtFecha(f.fechaInicio)} → ${fmtFecha(f.fechaFin)}</td>
                     <td class="text-end">${f.dias}</td><td class="text-end">${fmtMoneda(f.tarifaDiaria)}</td>
                     <td class="text-end">${fmtMoneda(f.subtotal)}</td></tr></tbody>
-                <tfoot><tr><th colspan="4" class="text-end">Total (${f.metodoPago})</th><th class="text-end">${fmtMoneda(f.total)}</th></tr></tfoot>
+                <tfoot>${f.garantia?.deposito > 0 ? html`<tr><td colspan="4" class="text-end">Depósito de garantía</td>
+                    <td class="text-end">${fmtMoneda(f.garantia.deposito)}</td></tr>` : ''}
+                    <tr><th colspan="4" class="text-end">Total pagado (${f.metodoPago})</th><th class="text-end">${fmtMoneda(f.total)}</th></tr></tfoot>
             </table></div>
+            ${liquidacionFactura(f.garantia)}
             <button type="button" class="btn btn-warning" data-descargar><i aria-hidden="true" class="bi bi-download me-1"></i>Descargar factura</button>`,
     });
     nodo.querySelector('[data-descargar]').addEventListener('click', () => descargarFactura(f.id, f.numero).catch(toastError));
+}
+
+/** Sección de la factura con lo que pasó con el depósito al devolver. */
+function liquidacionFactura(g) {
+    if (!g || !['DEVUELTO', 'DEVUELTO_PARCIAL', 'NO_DEVUELTO', 'LIQUIDADO', 'PENDIENTE_REPARACION'].includes(g.estado)) return '';
+    const fila = (texto, valor, clase = '') => html`<li class="list-group-item d-flex justify-content-between ${clase}"><span>${texto}</span><span>${valor}</span></li>`;
+    return html`<h3 class="h6 mt-3">Liquidación del depósito</h3><ul class="list-group mb-3">
+        ${fila('Estado', ESTADOS_DEPOSITO[g.estado]?.[0] || g.estado)}
+        ${g.diasRetraso > 0 ? fila(`Multa por ${g.diasRetraso} día(s) de retraso`, fmtMoneda(g.multaRetraso), 'text-danger') : ''}
+        ${g.cargoDanos > 0 ? fila('Daños / pérdida', fmtMoneda(g.cargoDanos)) : ''}
+        ${g.estado === 'PENDIENTE_REPARACION' ? fila('Daños', 'pendiente del costo de reparación')
+            : fila('Depósito devuelto', html`<strong>${fmtMoneda(g.montoDevuelto)}</strong>`)}
+        ${g.saldoPendiente > 0 ? fila('Saldo pendiente a cargo del cliente', fmtMoneda(g.saldoPendiente), 'text-danger fw-semibold') : ''}</ul>`;
+}
+
+// ================================================================ lista de espera
+
+/** Fechas que el usuario espera; las NOTIFICADA ya se liberaron y se pueden reservar. */
+export async function vistaListaEspera(contenedor, { destino = '#/reservas' } = {}) {
+    contenedor.innerHTML = encabezado('Lista de espera', 'Fechas ocupadas que está esperando. Si se liberan, le avisamos en la campana y aquí.');
+    const lista = document.createElement('div');
+    contenedor.appendChild(lista);
+    let herramientas = new Map();
+    let entradas = [];
+
+    async function recargar() {
+        cargando(lista);
+        try {
+            const [listaHerramientas, mias] = await Promise.all([api.get('/herramientas'), api.get('/lista-espera/mias')]);
+            herramientas = porId(listaHerramientas);
+            entradas = mias;
+            lista.innerHTML = entradas.length ? html`<div class="card border-0 shadow-sm"><div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 tabla-apilada"><thead class="table-light"><tr><th>Herramienta</th>
+                    <th>Fechas que espera</th><th>Estado</th><th class="text-end">Acciones</th></tr></thead>
+                <tbody>${entradas.map(e => html`<tr>
+                    <td data-label="Herramienta"><div class="fw-semibold">${herramientas.get(e.herramientaId)?.nombre || `Herramienta #${e.herramientaId}`}</div></td>
+                    <td data-label="Fechas"><div>${fmtFecha(e.fechaInicio)} → ${fmtFecha(e.fechaFin)}</div></td>
+                    <td data-label="Estado"><div>${badge(e.estado)}</div></td>
+                    <td data-label=""><div class="d-flex gap-1 justify-content-end">
+                        ${e.estado === 'NOTIFICADA' ? html`<button class="btn btn-sm btn-success" data-reservar="${e.id}">
+                            <i aria-hidden="true" class="bi bi-calendar-plus me-1"></i>Reservar ahora</button>` : ''}
+                        ${['ESPERANDO', 'NOTIFICADA'].includes(e.estado) ? html`<button class="btn btn-sm btn-outline-danger" data-salir-espera="${e.id}">
+                            <i aria-hidden="true" class="bi bi-x-lg me-1"></i>Salir de la lista</button>` : ''}</div></td></tr>`)}</tbody>
+                </table></div></div>`
+                : vacio('No está esperando ninguna fecha. Si una herramienta está ocupada, puede anotarse desde su ficha en el catálogo.', 'hourglass');
+        } catch (error) {
+            lista.innerHTML = '';
+            toastError(error);
+        }
+    }
+
+    lista.addEventListener('click', async evento => {
+        const reservar = evento.target.closest('[data-reservar]');
+        const salir = evento.target.closest('[data-salir-espera]');
+        if (reservar) {
+            const e = entradas.find(x => x.id === Number(reservar.dataset.reservar));
+            const h = herramientas.get(e.herramientaId);
+            if (h) modalReservar(h, () => { location.hash = destino; }, { inicio: e.fechaInicio, fin: e.fechaFin });
+        } else if (salir && await confirmar('¿Salir de la lista de espera de estas fechas?', { textoConfirmar: 'Salir de la lista' })) {
+            await ejecutar(() => api.del(`/lista-espera/${salir.dataset.salirEspera}`), 'Salió de la lista de espera.', recargar);
+        }
+    });
+    await recargar();
 }
 
 // ================================================================ facturas
@@ -481,7 +683,8 @@ export async function vistaInventario(contenedor, { admin }) {
                     <div class="small text-muted mb-2">${categorias.get(h.categoriaId)?.nombre || 'Sin categoría'}
                         ${admin ? html` · ${nombresProveedores.get(h.proveedorId)?.nombre || `Proveedor #${h.proveedorId}`}` : ''}</div>
                     <p class="small flex-grow-1">${h.descripcion}</p>
-                    <div class="fw-bold text-success mb-2">${fmtMoneda(h.tarifaDiaria)} / día</div>
+                    <div class="fw-bold text-success">${fmtMoneda(h.tarifaDiaria)} / día</div>
+                    <div class="small text-muted mb-2">${h.deposito > 0 ? html`Depósito: ${fmtMoneda(h.deposito)}` : 'Sin depósito'}</div>
                     <div class="d-flex gap-1 flex-wrap">
                         <button class="btn btn-sm btn-outline-secondary" data-accion="editar" data-id="${h.id}"><i aria-hidden="true" class="bi bi-pencil"></i> Editar</button>
                         <button class="btn btn-sm btn-outline-secondary" data-accion="imagen" data-id="${h.id}"><i aria-hidden="true" class="bi bi-image"></i> Imagen</button>
@@ -506,6 +709,10 @@ export async function vistaInventario(contenedor, { admin }) {
                 <select class="form-select" id="h-cat" name="categoriaId" required>${opciones([...categorias.values()], h.categoriaId, { vacia: 'Seleccione...' })}</select></div>
             <div class="col-sm-6"><label class="form-label" for="h-tarifa">Tarifa diaria (COP)</label>
                 <input type="number" class="form-control" id="h-tarifa" name="tarifaDiaria" min="1" step="0.01" value="${h.tarifaDiaria || ''}" required></div>
+            <div class="col-12"><label class="form-label" for="h-deposito">Depósito de garantía (COP)</label>
+                <input type="number" class="form-control" id="h-deposito" name="deposito" min="0" step="0.01" value="${h.deposito ?? ''}" placeholder="0 = sin depósito">
+                <div class="form-text">Se cobra con el alquiler y se devuelve al recibir la herramienta a tiempo y en buen estado.
+                    De él se descuentan la multa por retraso y los daños. Sugerencia: 2 días de tarifa.</div></div>
             ${h.id ? '' : html`<div class="col-12"><label class="form-label" for="h-img">Imagen (opcional)</label>
                 <input type="file" class="form-control" id="h-img" name="archivo" accept="image/jpeg,image/png,image/webp,image/gif">
                 <div class="form-text">JPG, PNG, WEBP o GIF de máximo 5 MB.</div></div>`}
@@ -517,6 +724,7 @@ export async function vistaInventario(contenedor, { admin }) {
             ...(datos.proveedorId ? { proveedorId: Number(datos.proveedorId) } : {}),
             categoriaId: Number(datos.categoriaId), nombre: datos.nombre.trim(),
             descripcion: datos.descripcion.trim(), tarifaDiaria: Number(datos.tarifaDiaria),
+            deposito: datos.deposito === '' ? 0 : Number(datos.deposito),
         };
     }
 

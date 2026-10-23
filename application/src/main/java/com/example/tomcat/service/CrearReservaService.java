@@ -11,6 +11,7 @@ import com.example.tomcat.model.Usuario;
 import com.example.tomcat.port.in.CrearReservaUseCase;
 import com.example.tomcat.port.in.dto.Solicitante;
 import com.example.tomcat.repository.HerramientaRepositoryPort;
+import com.example.tomcat.repository.ListaEsperaRepositoryPort;
 import com.example.tomcat.repository.ReservaRepositoryPort;
 import com.example.tomcat.repository.UsuarioRepositoryPort;
 
@@ -22,17 +23,20 @@ public class CrearReservaService implements CrearReservaUseCase {
     private final UsuarioRepositoryPort usuarioRepositoryPort;
     private final ReservaRepositoryPort reservaRepositoryPort;
     private final PoliticaVencimiento politica;
+    private final ListaEsperaRepositoryPort listaEsperaRepositoryPort;
 
     public CrearReservaService(
             HerramientaRepositoryPort herramientaRepositoryPort,
             UsuarioRepositoryPort usuarioRepositoryPort,
             ReservaRepositoryPort reservaRepositoryPort,
-            PoliticaVencimiento politica
+            PoliticaVencimiento politica,
+            ListaEsperaRepositoryPort listaEsperaRepositoryPort
     ) {
         this.herramientaRepositoryPort = herramientaRepositoryPort;
         this.usuarioRepositoryPort = usuarioRepositoryPort;
         this.reservaRepositoryPort = reservaRepositoryPort;
         this.politica = politica;
+        this.listaEsperaRepositoryPort = listaEsperaRepositoryPort;
     }
 
     @Override
@@ -59,7 +63,16 @@ public class CrearReservaService implements CrearReservaUseCase {
         // Queda PENDIENTE: el proveedor tiene el plazo máximo (1 hora por defecto) para aceptarla o rechazarla.
         Reserva reserva = new Reserva(null, clienteReserva, herramientaId, fechaInicio, fechaFin, "PENDIENTE",
                 null, null, null, null, politica.ahoraUtc(), null);
-        return reservaRepositoryPort.guardar(reserva);
+        Reserva creada = reservaRepositoryPort.guardar(reserva);
+        // Si estaba en la lista de espera de esas fechas, ya consiguió su reserva: sale de la fila.
+        listaEsperaRepositoryPort.listarPorCliente(clienteReserva).stream()
+                .filter(entrada -> entrada.activa() && herramientaId.equals(entrada.getHerramientaId())
+                        && entrada.seCruzaCon(fechaInicio, fechaFin))
+                .forEach(entrada -> {
+                    entrada.atender();
+                    listaEsperaRepositoryPort.guardar(entrada);
+                });
+        return creada;
     }
 
     private Long resolverCliente(Solicitante solicitante, Long clienteId) {

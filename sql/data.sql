@@ -1,6 +1,7 @@
 -- Población de la base de datos con datos de demostración (al menos 20 registros por entidad).
 -- Ejecutar después de sql/schema.sql:  mysql -u mysql -p < sql/schema.sql && mysql -u mysql -p < sql/data.sql
--- Contenido equivalente al que deja Flyway al aplicar V1-V12 (datos de V11 más las imágenes de V12).
+-- Contenido equivalente al que deja Flyway al aplicar V1-V17 (datos de V11, imágenes de V12, depósitos de V15,
+-- calificaciones de V16 y lista de espera de V17).
 --   3 roles (catálogo fijo), 41 usuarios (1 admin, 20 proveedores, 20 clientes), 41 asignaciones de rol,
 --   20 categorías, 30 herramientas, 34 reservas, 24 pagos, 24 facturas y 21 mantenimientos.
 --   Clave de todas las cuentas: Rentas2026*  (gabriel.mantenimiento@gmail.com está inactiva a propósito).
@@ -287,3 +288,65 @@ UPDATE herramientas SET imagen_url = '/images/herramientas/retroexcavadora.jpg' 
 UPDATE herramientas SET imagen_url = '/images/herramientas/senalizacion-vial.jpg' WHERE id = 28 AND nombre = 'Kit de Señalización Vial' AND imagen_url IS NULL;
 UPDATE herramientas SET imagen_url = '/images/herramientas/destapadora.jpg' WHERE id = 29 AND nombre = 'Destapadora Eléctrica' AND imagen_url IS NULL;
 UPDATE herramientas SET imagen_url = '/images/herramientas/taladro-columna.jpg' WHERE id = 30 AND nombre = 'Taladro de Columna' AND imagen_url IS NULL;
+
+-- Depósito de garantía (igual que la migración V15).
+-- Las herramientas de demostración piden un depósito equivalente a 2 días de alquiler.
+UPDATE herramientas SET deposito = tarifa_diaria * 2;
+
+-- Alquileres en curso (pagados y aún no devueltos): el depósito se cobró con el pago y está retenido.
+UPDATE reservas r JOIN herramientas h ON h.id = r.herramienta_id
+   SET r.deposito = h.deposito, r.estado_deposito = 'RETENIDO'
+ WHERE r.estado IN ('CONFIRMADA', 'ENTREGADA');
+UPDATE pagos p JOIN reservas r ON r.id = p.reserva_id
+   SET p.monto = p.monto + r.deposito
+ WHERE r.estado IN ('CONFIRMADA', 'ENTREGADA') AND p.estado_pago = 'COMPLETADO';
+UPDATE facturas f JOIN reservas r ON r.id = f.reserva_id
+   SET f.deposito = r.deposito, f.estado_deposito = 'RETENIDO', f.total = f.subtotal + r.deposito
+ WHERE r.estado IN ('CONFIRMADA', 'ENTREGADA');
+
+-- Historial anterior al depósito: los alquileres terminados se liquidaron sin depósito y el reembolsado lo devolvió.
+UPDATE reservas SET estado_deposito = 'LIQUIDADO' WHERE estado = 'FINALIZADA';
+UPDATE reservas r JOIN pagos p ON p.reserva_id = r.id
+   SET r.estado_deposito = 'REEMBOLSADO'
+ WHERE r.estado = 'CANCELADA' AND p.estado_pago = 'REEMBOLSADO';
+UPDATE facturas f JOIN reservas r ON r.id = f.reserva_id
+   SET f.estado_deposito = r.estado_deposito
+ WHERE r.estado IN ('FINALIZADA', 'CANCELADA');
+
+-- Para demostrar la multa: la reserva 15 (Rotomartillo SDS Plus, ya entregada) debía devolverse hace 2 días.
+-- Conserva sus 4 días de alquiler, así el monto pagado sigue siendo tarifa × días + depósito.
+UPDATE reservas
+   SET fecha_inicio = CURDATE() - INTERVAL 5 DAY, fecha_fin = CURDATE() - INTERVAL 2 DAY,
+       created_at = TIMESTAMP(CURDATE() - INTERVAL 8 DAY, '09:00:00'),
+       fecha_aceptacion = TIMESTAMP(CURDATE() - INTERVAL 8 DAY, '09:00:00') + INTERVAL 30 MINUTE,
+       fecha_entrega = TIMESTAMP(CURDATE() - INTERVAL 5 DAY, '08:00:00')
+ WHERE id = 15 AND estado = 'ENTREGADA';
+UPDATE facturas f JOIN reservas r ON r.id = f.reserva_id
+   SET f.fecha_inicio = r.fecha_inicio, f.fecha_fin = r.fecha_fin
+ WHERE r.id = 15;
+
+-- Calificaciones de demostración (igual que la migración V16).
+-- Reseñas de los alquileres terminados. Quedan sin calificar las reservas con id múltiplo de 4 (por ejemplo, la 32
+-- de juan.cliente@gmail.com) para poder calificarlas en la demostración.
+INSERT INTO calificaciones (reserva_id, cliente_id, cliente_nombre, herramienta_id, proveedor_id,
+                            estrellas_herramienta, estrellas_proveedor, comentario, fecha)
+SELECT r.id, r.cliente_id, u.nombre, r.herramienta_id, h.proveedor_id,
+       CASE r.estado_devolucion WHEN 'BUENO' THEN 4 + (r.id % 2) WHEN 'DANADO' THEN 3 ELSE 2 END,
+       CASE WHEN r.id % 3 = 0 THEN 4 ELSE 5 END,
+       CASE r.estado_devolucion
+           WHEN 'BUENO' THEN 'Funcionó muy bien y el proveedor la entregó a tiempo.'
+           WHEN 'DANADO' THEN 'Cumplió, aunque presentó una falla durante el uso.'
+           ELSE 'Buena atención del proveedor a pesar del inconveniente.' END,
+       COALESCE(r.fecha_devolucion, TIMESTAMP(CURDATE(), '12:00:00')) + INTERVAL 2 HOUR
+  FROM reservas r
+  JOIN herramientas h ON h.id = r.herramienta_id
+  JOIN usuarios u ON u.id = r.cliente_id
+ WHERE r.estado = 'FINALIZADA' AND r.id % 4 <> 0;
+
+-- Lista de espera de demostración (igual que la migración V17).
+-- ana.rentas@gmail.com espera las fechas de la reserva 5 (Sierra Circular de Banco, ya pagada). Si el administrador
+-- reembolsa ese pago, la reserva se cancela y Ana recibe el aviso en la campana.
+INSERT INTO lista_espera (herramienta_id, cliente_id, fecha_inicio, fecha_fin, estado, creada_en)
+SELECT r.herramienta_id, u.id, r.fecha_inicio, r.fecha_fin, 'ESPERANDO', UTC_TIMESTAMP() - INTERVAL 1 DAY
+  FROM reservas r JOIN usuarios u ON u.email = 'ana.rentas@gmail.com'
+ WHERE r.id = 5 AND r.estado = 'CONFIRMADA';

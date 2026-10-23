@@ -9,10 +9,12 @@ import com.example.tomcat.model.Mantenimiento;
 import com.example.tomcat.model.Reserva;
 import com.example.tomcat.port.in.GestionarReservaUseCase;
 import com.example.tomcat.port.in.dto.Solicitante;
+import com.example.tomcat.repository.FacturaRepositoryPort;
 import com.example.tomcat.repository.HerramientaRepositoryPort;
 import com.example.tomcat.repository.MantenimientoRepositoryPort;
 import com.example.tomcat.repository.ReservaRepositoryPort;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -27,19 +29,29 @@ public class GestionarReservaService implements GestionarReservaUseCase {
     private final MantenimientoRepositoryPort mantenimientoRepositoryPort;
     private final ControlAcceso controlAcceso;
     private final PoliticaVencimiento politica;
+    private final FacturaRepositoryPort facturaRepositoryPort;
+    /** Recargo sobre la tarifa por cada día de retraso al devolver (0,5 = 50%); app.reservas.recargo-mora. */
+    private final BigDecimal recargoMora;
+    private final AvisoListaEspera avisoListaEspera;
 
     public GestionarReservaService(
             ReservaRepositoryPort reservaRepositoryPort,
             HerramientaRepositoryPort herramientaRepositoryPort,
             MantenimientoRepositoryPort mantenimientoRepositoryPort,
             ControlAcceso controlAcceso,
-            PoliticaVencimiento politica
+            PoliticaVencimiento politica,
+            FacturaRepositoryPort facturaRepositoryPort,
+            BigDecimal recargoMora,
+            AvisoListaEspera avisoListaEspera
     ) {
         this.reservaRepositoryPort = reservaRepositoryPort;
         this.herramientaRepositoryPort = herramientaRepositoryPort;
         this.mantenimientoRepositoryPort = mantenimientoRepositoryPort;
         this.controlAcceso = controlAcceso;
         this.politica = politica;
+        this.facturaRepositoryPort = facturaRepositoryPort;
+        this.recargoMora = recargoMora;
+        this.avisoListaEspera = avisoListaEspera;
     }
 
     @Override
@@ -114,7 +126,9 @@ public class GestionarReservaService implements GestionarReservaUseCase {
     public Reserva rechazar(Solicitante solicitante, Long id) {
         Reserva reserva = buscarParaGestionar(solicitante, id);
         reserva.rechazar();
-        return reservaRepositoryPort.guardar(reserva);
+        Reserva rechazada = reservaRepositoryPort.guardar(reserva);
+        avisoListaEspera.fechasLiberadas(rechazada);
+        return rechazada;
     }
 
     @Override
@@ -127,11 +141,14 @@ public class GestionarReservaService implements GestionarReservaUseCase {
     @Override
     public Reserva devolver(Solicitante solicitante, Long id, String estadoEquipo, String observaciones) {
         Reserva reserva = buscarParaGestionar(solicitante, id);
-        reserva.devolver(estadoEquipo, observaciones);
-        Reserva actualizada = reservaRepositoryPort.guardar(reserva);
-
         Herramienta herramienta = herramientaRepositoryPort.buscarPorId(reserva.getHerramientaId())
                 .orElseThrow(() -> new RecursoNoEncontradoException("La herramienta no existe."));
+
+        // Si se devuelve después de la fecha fin, cada día de retraso genera una multa (tarifa + recargo) que se
+        // descuenta del depósito, igual que el costo de los daños.
+        reserva.devolver(estadoEquipo, observaciones, politica.hoy(), herramienta.getTarifaDiaria(), recargoMora);
+        Reserva actualizada = reservaRepositoryPort.guardar(reserva);
+        reflejarEnFactura(actualizada);
 
         if (actualizada.tieneDano()) {
             herramienta.cambiarEstado("MANTENIMIENTO");
@@ -175,12 +192,23 @@ public class GestionarReservaService implements GestionarReservaUseCase {
     public Reserva cancelar(Solicitante solicitante, Long id) {
         Reserva reserva = buscarComoTitular(solicitante, id);
         reserva.cancelar();
-        return reservaRepositoryPort.guardar(reserva);
+        Reserva cancelada = reservaRepositoryPort.guardar(reserva);
+        // Las fechas quedaron libres: se avisa al primero de la lista de espera.
+        avisoListaEspera.fechasLiberadas(cancelada);
+        return cancelada;
     }
 
     private Reserva buscar(Long id) {
         return reservaRepositoryPort.buscarPorId(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("La reserva no existe."));
+    }
+
+    /** La factura de la reserva muestra la liquidación del depósito (multa, daños, lo devuelto y el saldo). */
+    private void reflejarEnFactura(Reserva reserva) {
+        facturaRepositoryPort.buscarPorReservaId(reserva.getId()).ifPresent(factura -> {
+            factura.registrarLiquidacion(reserva.getGarantia());
+            facturaRepositoryPort.guardar(factura);
+        });
     }
 
     private Reserva buscarComoTitular(Solicitante solicitante, Long id) {

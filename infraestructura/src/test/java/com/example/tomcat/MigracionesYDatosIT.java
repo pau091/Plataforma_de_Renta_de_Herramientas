@@ -23,10 +23,10 @@ class MigracionesYDatosIT extends IntegracionBase {
     }
 
     @Test
-    @DisplayName("Flyway aplica todas las migraciones (V1–V14) sin errores")
+    @DisplayName("Flyway aplica todas las migraciones (V1–V17) sin errores")
     void migracionesAplicadas() {
         assertThat(jdbc.queryForObject("SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history WHERE success = 1", Integer.class))
-                .isEqualTo(14);
+                .isEqualTo(17);
         assertThat(contar("SELECT COUNT(*) FROM flyway_schema_history WHERE success = 0")).isZero();
     }
 
@@ -45,11 +45,14 @@ class MigracionesYDatosIT extends IntegracionBase {
     }
 
     @Test
-    @DisplayName("Datos coherentes: montos = tarifa × días y pagos completados solo en reservas pagadas")
+    @DisplayName("Datos coherentes: montos = tarifa × días + depósito y pagos completados solo en reservas pagadas")
     void datosCoherentes() {
         assertThat(contar("""
                 SELECT COUNT(*) FROM pagos p JOIN reservas r ON r.id = p.reserva_id JOIN herramientas h ON h.id = r.herramienta_id
-                WHERE p.monto <> h.tarifa_diaria * (DATEDIFF(r.fecha_fin, r.fecha_inicio) + 1)""")).isZero();
+                WHERE p.monto <> h.tarifa_diaria * (DATEDIFF(r.fecha_fin, r.fecha_inicio) + 1) + r.deposito""")).isZero();
+        // Solo los alquileres en curso tienen el depósito retenido.
+        assertThat(contar("SELECT COUNT(*) FROM reservas WHERE id <= 34 AND estado IN ('CONFIRMADA', 'ENTREGADA') AND estado_deposito <> 'RETENIDO'")).isZero();
+        assertThat(contar("SELECT COUNT(*) FROM reservas WHERE id = 15 AND estado = 'ENTREGADA' AND fecha_fin = CURDATE() - INTERVAL 2 DAY")).isEqualTo(1);
         assertThat(contar("""
                 SELECT COUNT(*) FROM pagos p JOIN reservas r ON r.id = p.reserva_id
                 WHERE p.estado_pago = 'COMPLETADO' AND r.estado NOT IN ('CONFIRMADA', 'ENTREGADA', 'FINALIZADA')""")).isZero();

@@ -4,6 +4,7 @@ import com.example.tomcat.exception.AccesoDenegadoException;
 import com.example.tomcat.exception.ConflictoException;
 import com.example.tomcat.exception.DomainException;
 import com.example.tomcat.model.Factura;
+import com.example.tomcat.model.Herramienta;
 import com.example.tomcat.model.Pago;
 import com.example.tomcat.model.Reserva;
 import com.example.tomcat.model.Rol;
@@ -60,7 +61,7 @@ class PagosServiceTest {
     @BeforeEach
     void preparar() {
         procesar = new ProcesarPagoService(pagos, reservas, herramientas, usuarios, facturas, POLITICA);
-        gestionar = new GestionarPagoService(pagos, reservas, facturas);
+        gestionar = new GestionarPagoService(pagos, reservas, facturas, org.mockito.Mockito.mock(AvisoListaEspera.class));
         when(herramientas.buscarPorId(HERRAMIENTA_ID)).thenReturn(Optional.of(herramienta("DISPONIBLE")));
         when(usuarios.buscarPorId(CLIENTE_ID)).thenReturn(Optional.of(usuario(CLIENTE_ID, "Juan Cliente", Rol.CLIENTE, true)));
         when(pagos.guardar(any())).thenAnswer(inv -> {
@@ -116,6 +117,28 @@ class PagosServiceTest {
             assertThatThrownBy(() -> procesar.procesar(CLIENTE, 7L, new BigDecimal("100000"), "TARJETA"))
                     .isInstanceOf(DomainException.class).hasMessageContaining("135000");
             verify(pagos, never()).guardar(any());
+        }
+
+        @Test
+        @DisplayName("Con depósito: se paga alquiler + depósito; la factura lo separa y el depósito queda RETENIDO")
+        void pagoConDeposito() {
+            when(herramientas.buscarPorId(HERRAMIENTA_ID)).thenReturn(Optional.of(new Herramienta(HERRAMIENTA_ID, PROVEEDOR_ID,
+                    1L, "Taladro Percutor", "800W", new BigDecimal("45000"), "DISPONIBLE", null, new BigDecimal("90000"))));
+            existe(reserva(7L, "ACEPTADA"));
+
+            assertThatThrownBy(() -> procesar.procesar(CLIENTE, 7L, MONTO, "TARJETA"))
+                    .isInstanceOf(DomainException.class).hasMessageContaining("225000").hasMessageContaining("depósito");
+
+            Reserva otra = existe(reserva(8L, "ACEPTADA"));
+            ArgumentCaptor<Factura> factura = ArgumentCaptor.forClass(Factura.class);
+            procesar.procesar(CLIENTE, 8L, new BigDecimal("225000"), "TARJETA");
+
+            assertThat(otra.getGarantia().estado()).isEqualTo("RETENIDO");
+            assertThat(otra.getGarantia().deposito()).isEqualByComparingTo("90000");
+            verify(facturas).guardar(factura.capture());
+            assertThat(factura.getValue().getSubtotal()).isEqualByComparingTo("135000");
+            assertThat(factura.getValue().getTotal()).isEqualByComparingTo("225000");
+            assertThat(factura.getValue().getGarantia().estado()).isEqualTo("RETENIDO");
         }
 
         @Test

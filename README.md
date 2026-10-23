@@ -8,7 +8,7 @@ devoluciones con daños y la rentabilidad de la plataforma.
 - **Base de datos:** MySQL 8 con migraciones Flyway, scripts SQL y datos de demostración (20 o más registros por entidad).
 - **Frontend:** HTML, CSS y JavaScript puro con Bootstrap 5, responsivo, con un panel distinto para cada rol.
 - **Despliegue:** WAR en **Apache Tomcat 11** (con Docker Compose o en un Tomcat instalado).
-- **Documentación y pruebas:** Swagger con ejemplos JSON, colección de Postman y 204 pruebas automatizadas.
+- **Documentación y pruebas:** Swagger con ejemplos JSON, colección de Postman y 252 pruebas automatizadas.
 
 ---
 
@@ -33,9 +33,9 @@ devoluciones con daños y la rentabilidad de la plataforma.
 
 | Rol | Puede |
 |---|---|
-| **Administrador** | Registrar, editar, desactivar y eliminar proveedores y clientes. Gestionar herramientas y categorías. Ver el historial de alquileres y el estado de los equipos. Atender incidencias (equipos dañados o perdidos). Supervisar pagos y facturación (corregir el método o reembolsar). Ver reportes de ingresos, rentabilidad, herramientas más alquiladas, clientes frecuentes y disponibilidad. El **administrador principal** (`admin@rentas.com`) es el único que puede ascender o bajar de rango a los usuarios. |
-| **Proveedor** | Publicar, editar y eliminar sus herramientas con imagen, descripción, costo y estado. Aceptar o rechazar solicitudes de alquiler. Registrar entregas y confirmar devoluciones reportando daños. Gestionar mantenimientos. Consultar las facturas generadas por sus alquileres. También puede **alquilar herramientas de otros proveedores** como un cliente: reservar, pagar y descargar sus facturas (nunca sus propias herramientas). |
-| **Cliente** | Registrarse e iniciar sesión. Buscar herramientas por categoría, texto y disponibilidad en un rango de fechas. Reservar, cambiar las fechas o cancelar. Pagar en línea (confirmación automática). Descargar sus facturas y revisar su historial. |
+| **Administrador** | Registrar, editar, desactivar y eliminar proveedores y clientes. Gestionar herramientas y categorías. Ver el historial de alquileres y el estado de los equipos. Atender incidencias (equipos dañados o perdidos). Supervisar pagos y facturación (corregir el método o reembolsar). Ver reportes de ingresos, rentabilidad, multas por devolución tardía, herramientas más alquiladas, clientes frecuentes y disponibilidad. El **administrador principal** (`admin@rentas.com`) es el único que puede ascender o bajar de rango a los usuarios. |
+| **Proveedor** | Publicar, editar y eliminar sus herramientas con imagen, descripción, costo, **depósito de garantía** y estado. Aceptar o rechazar solicitudes de alquiler. Registrar entregas y confirmar devoluciones reportando daños. Gestionar mantenimientos. Consultar las facturas generadas por sus alquileres. También puede **alquilar herramientas de otros proveedores** como un cliente: reservar, pagar y descargar sus facturas (nunca sus propias herramientas). |
+| **Cliente** | Registrarse e iniciar sesión. Buscar herramientas por categoría, texto y disponibilidad en un rango de fechas. Reservar, cambiar las fechas o cancelar. Pagar en línea (confirmación automática). Descargar sus facturas y revisar su historial. **Calificar** los alquileres terminados (1 a 5 estrellas) y anotarse en la **lista de espera** de fechas ocupadas, con aviso en la campana cuando se liberan. |
 
 ---
 
@@ -81,7 +81,7 @@ infraestructura → Spring Boot: controllers REST, seguridad JWT, JPA, Flyway, c
 │   ├── java/.../adapter/out/            Entidades JPA, repositorios Spring Data, mappers, almacenamiento en disco
 │   ├── java/.../security/               Filtro JWT, configuración de Spring Security, errores 401/403 en JSON
 │   ├── java/.../config/                 Cableado de casos de uso, transacciones, CORS, Swagger, vencimiento programado
-│   ├── resources/db/migration/          Migraciones Flyway V1–V14
+│   ├── resources/db/migration/          Migraciones Flyway V1–V17
 │   └── resources/static/                Frontend (index.html, css/, js/, images/)
 ├── sql/                schema.sql y data.sql (creación y población de la base)
 ├── docs/               Diagrama relacional (imagen y fuente Mermaid)
@@ -263,6 +263,7 @@ jwt.expiration-ms=86400000
 app.zona-horaria=${APP_ZONA_HORARIA:America/Bogota}
 app.uploads.dir=${APP_UPLOADS_DIR:uploads}
 app.reservas.plazo-maximo=${APP_RESERVAS_PLAZO_MAXIMO:PT1H}
+app.reservas.recargo-mora=${APP_RESERVAS_RECARGO_MORA:0.5}
 app.vencimiento.cron=${APP_VENCIMIENTO_CRON:0 * * * * *}
 ```
 
@@ -273,6 +274,7 @@ app.vencimiento.cron=${APP_VENCIMIENTO_CRON:0 * * * * *}
 | `APP_ZONA_HORARIA` | Zona horaria del negocio: define qué día es "hoy" para las reservas |
 | `APP_UPLOADS_DIR` | Carpeta donde se guardan las imágenes subidas (se publican en `/uploads/**`) |
 | `APP_RESERVAS_PLAZO_MAXIMO` | Plazo para aceptar o pagar una reserva antes de que venza (ISO-8601, por defecto 1 hora) |
+| `APP_RESERVAS_RECARGO_MORA` | Recargo de la multa por devolución tardía: cada día de retraso cuesta la tarifa × (1 + recargo); por defecto 0.5 (50%) |
 | `APP_VENCIMIENTO_CRON` | Cada cuánto se revisan las reservas vencidas (por defecto, cada minuto) |
 
 El archivo `.env.example` trae una plantilla de estas variables. Copie el archivo como `.env` (que no se sube a Git) si las necesita.
@@ -291,6 +293,11 @@ La fuente editable del diagrama está en [`docs/diagrama-er.mmd`](docs/diagrama-
 - Un **proveedor** tiene muchas **herramientas**, y cada herramienta pertenece a una **categoría**.
 - Un **cliente** tiene muchas **reservas** sobre herramientas. Cada reserva tiene **pagos**, y cada pago genera una **factura**.
 - Una herramienta tiene **mantenimientos**. Los que nacen de una devolución con daño quedan ligados a la reserva.
+- `reservas` y `facturas` guardan el **depósito de garantía** y su liquidación (multa por retraso, daños, lo devuelto y el
+  saldo pendiente); la factura conserva una copia, como el resto de sus datos.
+- Una reserva terminada tiene a lo sumo **una** `calificacion` (índice único sobre `reserva_id`).
+- `lista_espera` guarda quién espera qué fechas de cada herramienta (el orden de llegada define la fila) y `notificaciones`,
+  los avisos de la campana.
 - `tokens_emitidos` y `tokens_revocados` (la lista negra) guardan los `jti` de los JWT para poder expulsar al instante a un
   usuario suspendido o baneado. Son datos técnicos: se borran en cascada con el usuario y se limpian al expirar.
 - Las llaves foráneas del negocio usan `RESTRICT`: nunca se borra historial en cascada.
@@ -302,9 +309,9 @@ La fuente editable del diagrama está en [`docs/diagrama-er.mmd`](docs/diagrama-
 
 | Archivo | Contenido |
 |---|---|
-| [`sql/schema.sql`](sql/schema.sql) | Creación de la base y de las 11 tablas, con llaves, restricciones e índices |
+| [`sql/schema.sql`](sql/schema.sql) | Creación de la base y de las 14 tablas, con llaves, restricciones e índices |
 | [`sql/data.sql`](sql/data.sql) | Datos de demostración |
-| `infraestructura/src/main/resources/db/migration/V1…V14` | Las mismas definiciones como migraciones Flyway: la aplicación las aplica sola al arrancar |
+| `infraestructura/src/main/resources/db/migration/V1…V17` | Las mismas definiciones como migraciones Flyway: la aplicación las aplica sola al arrancar |
 
 Para crear la base a mano:
 
@@ -479,6 +486,10 @@ endpoint con su descripción, los roles permitidos, ejemplos JSON de petición y
 | PUT / DELETE | `/api/reservas/{id}` | Cambiar fechas / cancelar | Cliente dueño, Admin |
 | POST | `/api/reservas/{id}/aceptar`, `/rechazar`, `/entregar`, `/devolver` | Gestionar la reserva | Proveedor dueño, Admin |
 | POST | `/api/reservas/vencer` | Ejecutar ya el vencimiento automático | Admin |
+| POST | `/api/reservas/{id}/calificacion` | Calificar un alquiler terminado (1 a 5 estrellas) | Quien alquiló |
+| GET | `/api/herramientas/{id}/calificaciones`, `/api/calificaciones/resumen`, `/api/calificaciones/mias` | Reseñas y promedios | Todos |
+| POST / GET / DELETE | `/api/lista-espera`, `/api/lista-espera/mias`, `/api/lista-espera/{id}` | Anotarse, ver y salir de la lista de espera | Cliente, Proveedor |
+| GET / PATCH / POST | `/api/notificaciones`, `/no-leidas`, `/{id}/leida`, `/leidas` | Avisos de la campana | Todos |
 | GET | `/api/reservas/disponibilidad?fechaInicio&fechaFin`, `/api/reservas/disponibilidad/{herramientaId}?...` | Disponibilidad por fechas | Todos |
 | POST | `/api/pagos` | Pagar (confirma la reserva y genera la factura) | Quien hizo la reserva, Admin |
 | GET | `/api/pagos[?reservaId]`, `/api/pagos/{id}`, `/api/pagos/reserva/{id}` | Historial de pagos | Según el rol |
@@ -486,7 +497,7 @@ endpoint con su descripción, los roles permitidos, ejemplos JSON de petición y
 | GET | `/api/facturas[?clienteId]`, `/{id}`, `/pago/{pagoId}`, `/reserva/{reservaId}` | Facturas | Según el rol |
 | GET | `/api/facturas/{id}/descargar` | Descargar la factura en PDF | Según el rol |
 | GET / POST | `/api/mantenimientos[?herramientaId\|reservaId]`, `/api/mantenimientos/{id}/cerrar` | Mantenimientos | Proveedor, Admin |
-| GET | `/api/reportes/ingresos`, `/rentabilidad`, `/herramientas-mas-alquiladas`, `/clientes-frecuentes`, `/disponibilidad`, `/incidencias` | Reportes | Admin |
+| GET | `/api/reportes/ingresos`, `/rentabilidad`, `/herramientas-mas-alquiladas`, `/clientes-frecuentes`, `/disponibilidad`, `/incidencias`, `/multas` | Reportes | Admin |
 | GET | `/api/panel` | Resumen según el rol | Todos |
 
 ### Ejemplos en JSON
@@ -608,10 +619,11 @@ aunque reserven en el mismo instante:
 - El proveedor tiene **1 hora** para aceptar una reserva y el cliente **1 hora** para pagarla.
 - Un proceso programado corre cada minuto y marca como `VENCIDA` las reservas fuera de plazo o cuya fecha de inicio ya pasó.
   El administrador también puede ejecutarlo con `POST /api/reservas/vencer`.
-- Una reserva vencida, rechazada o cancelada libera las fechas.
+- Una reserva vencida, rechazada o cancelada libera las fechas (y avisa al primero de la lista de espera).
 
 **Pago y factura.**
-- El monto debe ser exactamente `tarifa diaria × días` (los días se cuentan con ambos extremos incluidos).
+- El monto debe ser exactamente `tarifa diaria × días` **más el depósito de garantía** de la herramienta, si lo tiene (los días
+  se cuentan con ambos extremos incluidos).
 - El pago, la confirmación de la reserva y la factura (`FAC-000001`, ...) se registran en **una sola transacción**.
 - El administrador puede reembolsar un pago mientras la herramienta no se haya entregado: el pago queda `REEMBOLSADO`, la reserva
   `CANCELADA` y la factura `ANULADA`.
@@ -624,6 +636,35 @@ aunque reserven en el mismo instante:
 - `DANADO`: la herramienta pasa a `MANTENIMIENTO` y se abre un mantenimiento ligado a la reserva.
 - `PERDIDO`: la herramienta pasa a `FUERA_DE_SERVICIO`.
 - Al cerrar el mantenimiento con su costo, la herramienta vuelve a estar disponible.
+
+**Depósito de garantía.** El proveedor fija el depósito de cada herramienta (0 = sin depósito). Se cobra con el alquiler y
+queda `RETENIDO` mientras la herramienta está fuera. Al devolverla se **liquida**:
+
+| Devolución | Qué pasa con el depósito |
+|---|---|
+| A tiempo y en buen estado | Se devuelve completo (`DEVUELTO`) |
+| Con retraso | Se descuenta la multa por retraso (`DEVUELTO_PARCIAL` o `NO_DEVUELTO`) |
+| `DANADO` | Queda `PENDIENTE_REPARACION`; al cerrar el mantenimiento se descuenta el **costo real** de la reparación |
+| `PERDIDO` | No se devuelve (`NO_DEVUELTO`) |
+
+Si los cargos superan el depósito, la diferencia queda como **saldo pendiente** a cargo del cliente. La factura (también en
+el PDF) muestra el depósito y su liquidación. El reembolso de un pago antes de la entrega devuelve también el depósito.
+
+**Multa por devolución tardía.** Si el proveedor registra la devolución después de la fecha fin, cada día de retraso cuesta
+`tarifa diaria × (1 + recargo)`; con el recargo por defecto del 50%, una herramienta de $42.000 devuelta 2 días tarde paga
+$126.000 de multa. Se descuenta del depósito y aparece en la factura, en `GET /api/reportes/multas` y en los ingresos.
+Ingresos = alquileres + multas + daños cobrados; el depósito en custodia **no** es ingreso. Los datos de demostración traen
+la reserva 15 (Rotomartillo SDS Plus, de `camila.herramientas@gmail.com`) atrasada 2 días para probarlo.
+
+**Calificaciones.** Al terminar un alquiler (`FINALIZADA`), quien lo hizo califica la herramienta y/o al proveedor de 1 a 5
+estrellas, con un comentario opcional, **una sola vez** (también lo garantiza un índice único en la base). El catálogo
+muestra el promedio y la ficha, las últimas reseñas. La reserva 32 de `juan.cliente@gmail.com` quedó sin calificar para
+probarlo.
+
+**Lista de espera.** Si las fechas de una herramienta están ocupadas, el cliente puede anotarse desde la ficha. Cuando la
+reserva que las ocupa **se cancela, se rechaza, vence o se reembolsa**, se avisa (campana de la página) **solo al primero de
+la fila** cuyas fechas quedaron completamente libres; su entrada pasa a `NOTIFICADA` y si reserva, a `ATENDIDA`. En la
+demostración, `ana.rentas@gmail.com` espera las fechas de la reserva 5: si el admin reembolsa ese pago, Ana recibe el aviso.
 
 **Historial protegido.** No se eliminan usuarios ni herramientas que tengan reservas, pagos o mantenimientos: se desactivan
 (`activo=false`) o se marcan como `FUERA_DE_SERVICIO`.
@@ -677,9 +718,9 @@ En Windows PowerShell use `.\mvnw.cmd test` y `.\mvnw.cmd verify`.
 
 | Tipo | Ubicación | Cantidad | Qué cubre |
 |---|---|---|---|
-| Unitarias de dominio | `domain/src/test` | 80 | Ciclo de vida de la reserva, vencimiento, cancelación, devolución, pagos, facturas, herramientas, usuarios (suspensión y baneo) y objetos de valor |
-| Unitarias de servicios | `application/src/test` | 65 | Reglas de negocio y de acceso por rol con Mockito y un reloj fijo (reservas, pagos, reembolsos, cambio de rol, sanciones, autenticación, reportes, imágenes) |
-| Integración | `infraestructura/src/test` (`*IT`) | 59 | La aplicación completa contra un **MySQL 8.4 real en Docker** (Testcontainers): migraciones, seguridad JWT y permisos, lista negra de tokens, cambio de rol, proveedor que alquila, flujos completos por HTTP, concurrencia (peticiones simultáneas), imágenes (incluidas las fotos de demostración), CRUD y restricciones de la base |
+| Unitarias de dominio | `domain/src/test` | 101 | Ciclo de vida de la reserva, depósito y multa por retraso, calificaciones, lista de espera, vencimiento, cancelación, devolución, pagos, facturas, herramientas, usuarios (suspensión y baneo) y objetos de valor |
+| Unitarias de servicios | `application/src/test` | 82 | Reglas de negocio y de acceso por rol con Mockito y un reloj fijo (reservas, pagos con depósito, devolución tardía, calificaciones, lista de espera, reembolsos, cambio de rol, sanciones, autenticación, reportes, imágenes) |
+| Integración | `infraestructura/src/test` (`*IT`) | 69 | La aplicación completa contra un **MySQL 8.4 real en Docker** (Testcontainers): migraciones, seguridad JWT y permisos, lista negra de tokens, depósito y multa, calificaciones, lista de espera y notificaciones, cambio de rol, proveedor que alquila, flujos completos por HTTP, concurrencia (peticiones simultáneas), imágenes (incluidas las fotos de demostración), CRUD y restricciones de la base |
 
 - Las pruebas de integración arrancan su propio MySQL temporal; no usan la base de Docker Compose.
 - Si Docker no está disponible, se **omiten** en lugar de fallar.

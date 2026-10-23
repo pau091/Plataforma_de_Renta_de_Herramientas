@@ -79,10 +79,14 @@ class FlujoAlquilerIT extends IntegracionBase {
                 Map.of("costoReparacion", 20000)), 200);
         assertThat(esperar(GET("/api/herramientas/" + herramienta, CLIENTE), 200).get("estado").asText()).isEqualTo("DISPONIBLE");
 
-        // Rentabilidad de la herramienta: 90.000 - 20.000.
+        // Sin depósito, el daño (20.000) queda como saldo pendiente a cargo del cliente y compensa la reparación:
+        // rentabilidad = 90.000 de alquiler + 20.000 cobrados por el daño − 20.000 de reparación.
+        JsonNode garantia = reserva(id, CLIENTE).get("garantia");
+        assertThat(garantia.get("cargoDanos").decimalValue()).isEqualByComparingTo("20000");
+        assertThat(garantia.get("saldoPendiente").decimalValue()).isEqualByComparingTo("20000");
         JsonNode item = StreamSupport.stream(esperar(GET("/api/reportes/rentabilidad", ADMIN), 200).get("items").spliterator(), false)
                 .filter(n -> n.get("herramientaId").asLong() == herramienta).findFirst().orElseThrow();
-        assertThat(item.get("utilidad").decimalValue()).isEqualByComparingTo("70000");
+        assertThat(item.get("utilidad").decimalValue()).isEqualByComparingTo("90000");
 
         // Lo que tiene historial no se borra.
         esperar(DELETE("/api/herramientas/" + herramienta, PROVEEDOR), 409);

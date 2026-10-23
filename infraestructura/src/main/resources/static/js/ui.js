@@ -56,10 +56,15 @@ export const instante = texto => (texto ? new Date(texto.endsWith('Z') ? texto :
 export const fmtInstante = texto => (texto ? fechaHora.format(instante(texto)) : '—');
 export const fmtHora = fecha => hora.format(fecha);
 
+/** Zona horaria del negocio: debe coincidir con app.zona-horaria del backend, que decide qué día es "hoy". */
+const ZONA_NEGOCIO = 'America/Bogota';
+
+/** Fecha de hoy (yyyy-mm-dd) en la zona del negocio, no en la del equipo, para coincidir con el backend. */
 export function hoyIso(sumarDias = 0) {
-    const d = new Date();
-    d.setDate(d.getDate() + sumarDias);
-    return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+    const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: ZONA_NEGOCIO }).format(new Date());
+    const d = new Date(`${hoy}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + sumarDias);
+    return d.toISOString().slice(0, 10);
 }
 
 /** Días de alquiler con ambos extremos incluidos (igual que el backend). */
@@ -85,12 +90,25 @@ const ESTADOS = {
     VIGENTE: ['success', 'Vigente'], ANULADA: ['danger', 'Anulada'],
     // devoluciones
     BUENO: ['success', 'Buen estado'], DANADO: ['warning', 'Dañado'], PERDIDO: ['danger', 'Perdido'],
+    // lista de espera
+    ESPERANDO: ['warning', 'Esperando'], NOTIFICADA: ['success', '¡Ya está libre!'], ATENDIDA: ['primary', 'Reservada'],
 };
 
 export function badge(estado) {
     const [color, texto] = ESTADOS[estado] || ['light', estado || '—'];
     const textoOscuro = ['warning', 'info', 'light'].includes(color) ? ' text-dark' : '';
     return html`<span class="badge text-bg-${color}${textoOscuro}">${texto}</span>`;
+}
+
+/** Promedio de 1 a 5 como estrellas (con media estrella) y el número de reseñas. */
+export function estrellas(promedio, total) {
+    if (!total) return html`<span class="small text-muted"><i aria-hidden="true" class="bi bi-star"></i> Sin reseñas</span>`;
+    const valor = Number(promedio);
+    const llenas = Math.floor(valor);
+    const media = valor - llenas >= 0.5;
+    const iconos = [0, 1, 2, 3, 4].map(i => (i < llenas ? 'star-fill' : i === llenas && media ? 'star-half' : 'star'));
+    return html`<span class="small text-warning text-nowrap" title="${valor.toFixed(1)} de 5">${iconos.map(i =>
+        html`<i aria-hidden="true" class="bi bi-${i}"></i>`)}<span class="text-muted ms-1">${valor.toFixed(1)} (${total})</span></span>`;
 }
 
 export const nombreEstado = estado => (ESTADOS[estado] ? ESTADOS[estado][1] : estado);

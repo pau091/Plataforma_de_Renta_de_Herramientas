@@ -64,6 +64,9 @@ public class FacturaEntity {
     @Column(nullable = false)
     private String estado = "VIGENTE";
 
+    @Embedded
+    private GarantiaEmbeddable garantia = new GarantiaEmbeddable();
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getNumero() { return numero; }
@@ -100,4 +103,6 @@ public class FacturaEntity {
     public void setFechaEmision(LocalDateTime fechaEmision) { this.fechaEmision = fechaEmision; }
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }
+    public GarantiaEmbeddable getGarantia() { return garantia; }
+    public void setGarantia(GarantiaEmbeddable garantia) { this.garantia = garantia; }
 }

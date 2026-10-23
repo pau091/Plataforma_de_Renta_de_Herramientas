@@ -1,7 +1,7 @@
 // Vistas del CLIENTE: panel, catálogo con búsqueda, historial de reservas y facturas.
 import { api, conParametros } from '../api.js';
-import { badge, barrasPorEstado, cargando, fmtFecha, fmtMoneda, hoyIso, html, imagenHerramienta, kpi, opciones, toastError, vacio } from '../ui.js';
-import { cargarCategorias, encabezado, modalReservar, porId, vistaFacturas, vistaReservas } from './comun.js';
+import { badge, barrasPorEstado, cargando, estrellas, fmtFecha, fmtMoneda, hoyIso, html, imagenHerramienta, kpi, opciones, toastError, vacio } from '../ui.js';
+import { cargarCategorias, encabezado, modalReservar, porId, vistaFacturas, vistaListaEspera, vistaReservas } from './comun.js';
 
 export async function inicio(contenedor, usuario) {
     cargando(contenedor);
@@ -43,8 +43,9 @@ export async function inicio(contenedor, usuario) {
 export async function catalogo(contenedor, usuario, { destino = '#/reservas', excluirProveedorId } = {}) {
     cargando(contenedor);
     let categorias;
+    let resumen = { herramientas: [], proveedores: [] };
     try {
-        categorias = await cargarCategorias();
+        [categorias, resumen] = await Promise.all([cargarCategorias(), api.get('/calificaciones/resumen')]);
     } catch (error) {
         contenedor.innerHTML = '';
         return toastError(error);
@@ -105,10 +106,12 @@ export async function catalogo(contenedor, usuario, { destino = '#/reservas', ex
                 <div class="card-body d-flex flex-column">
                     <div class="d-flex justify-content-between gap-2">
                         <h3 class="h6 mb-1"><a href="#" class="text-reset text-decoration-none" data-detalle="${h.id}">${h.nombre}</a></h3>${badge(h.estado)}</div>
-                    <div class="small text-muted mb-2"><i aria-hidden="true" class="bi bi-tag"></i> ${nombresCategorias.get(h.categoriaId)?.nombre || 'Sin categoría'}</div>
+                    <div class="small text-muted mb-1"><i aria-hidden="true" class="bi bi-tag"></i> ${nombresCategorias.get(h.categoriaId)?.nombre || 'Sin categoría'}</div>
+                    <div class="mb-2">${(p => estrellas(p?.promedio, p?.total))(resumen.herramientas.find(r => r.id === h.id))}</div>
                     <p class="small flex-grow-1">${h.descripcion}</p>
                     <div class="d-flex justify-content-between align-items-center">
-                        <div><span class="fs-5 fw-bold text-success">${fmtMoneda(h.tarifaDiaria)}</span><span class="small text-muted"> / día</span></div>
+                        <div><span class="fs-5 fw-bold text-success">${fmtMoneda(h.tarifaDiaria)}</span><span class="small text-muted"> / día</span>
+                            ${h.deposito > 0 ? html`<div class="small text-muted">+ depósito ${fmtMoneda(h.deposito)}</div>` : ''}</div>
                         <button class="btn btn-warning btn-sm" data-reservar="${h.id}" ${h.estado === 'DISPONIBLE' ? '' : html`disabled`}>
                             <i aria-hidden="true" class="bi bi-calendar-plus me-1"></i>Reservar</button></div>
                 </div></div></div>`)}</div>`
@@ -126,7 +129,7 @@ export async function catalogo(contenedor, usuario, { destino = '#/reservas', ex
         const herramienta = herramientas.find(h => h.id === Number(boton.dataset.reservar || boton.dataset.detalle));
         modalReservar(herramienta, () => { location.hash = destino; }, {
             inicio: form.fechaInicio.value, fin: form.fechaFin.value,
-            categoria: nombresCategorias.get(herramienta.categoriaId)?.nombre,
+            categoria: nombresCategorias.get(herramienta.categoriaId)?.nombre, resumen,
         });
     });
     await buscar();
@@ -137,6 +140,8 @@ export const reservas = contenedor => vistaReservas(contenedor, {
     rol: 'CLIENTE', titulo: 'Mis reservas',
     subtitulo: 'Historial de alquileres y estado de las herramientas. Pague las reservas aceptadas antes de que venza el plazo.',
 });
+
+export const listaEspera = contenedor => vistaListaEspera(contenedor, { destino: '#/reservas' });
 
 export const facturas = contenedor => vistaFacturas(contenedor, {
     titulo: 'Pagos y facturas', subtitulo: 'Comprobantes de sus pagos. Puede descargarlos en cualquier momento.',

@@ -6,6 +6,7 @@ import com.example.tomcat.port.in.dto.ReporteDisponibilidad;
 import com.example.tomcat.port.in.dto.ReporteHerramientasMasAlquiladas;
 import com.example.tomcat.port.in.dto.ReporteIncidencias;
 import com.example.tomcat.port.in.dto.ReporteIngresos;
+import com.example.tomcat.port.in.dto.ReporteMultas;
 import com.example.tomcat.port.in.dto.ReporteRentabilidad;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -28,8 +29,10 @@ public class ReporteController {
         this.consultarReportesUseCase = consultarReportesUseCase;
     }
 
-    @Operation(summary = "Ingresos por alquileres",
-            description = "**Rol:** ADMIN. Suma de los pagos COMPLETADO (los reembolsados no cuentan), total y por método de pago.")
+    @Operation(summary = "Ingresos por alquileres, multas y daños",
+            description = "**Rol:** ADMIN. Pagos COMPLETADO (los reembolsados no cuentan). El depósito de garantía no es "
+                    + "ingreso: se informa aparte lo que está en custodia y lo devuelto. totalIngresos = alquileres + multas "
+                    + "por retraso + daños cobrados del depósito; saldoPendientePorCobrar = lo que el depósito no alcanzó a cubrir.")
     @ApiResponse(responseCode = "200", description = "Reporte de ingresos")
     @GetMapping("/ingresos")
     public ResponseEntity<ReporteIngresos> ingresos() {
@@ -80,5 +83,14 @@ public class ReporteController {
     @GetMapping("/incidencias")
     public ResponseEntity<ReporteIncidencias> incidencias() {
         return ResponseEntity.ok(consultarReportesUseCase.incidencias());
+    }
+
+    @Operation(summary = "Multas por devolución tardía",
+            description = "**Rol:** ADMIN. Devoluciones registradas después de la fecha fin: días de retraso, multa "
+                    + "(tarifa + recargo por día), cuánto se descontó del depósito y el saldo pendiente. Más recientes primero.")
+    @ApiResponse(responseCode = "200", description = "Devoluciones tardías y sus multas")
+    @GetMapping("/multas")
+    public ResponseEntity<ReporteMultas> multas() {
+        return ResponseEntity.ok(consultarReportesUseCase.multas());
     }
 }

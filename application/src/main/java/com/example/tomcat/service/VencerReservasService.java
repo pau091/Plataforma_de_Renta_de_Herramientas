@@ -14,12 +14,14 @@ public class VencerReservasService implements VencerReservasUseCase {
     private final ReservaRepositoryPort reservaRepositoryPort;
     private final PagoRepositoryPort pagoRepositoryPort;
     private final PoliticaVencimiento politica;
+    private final AvisoListaEspera avisoListaEspera;
 
     public VencerReservasService(ReservaRepositoryPort reservaRepositoryPort, PagoRepositoryPort pagoRepositoryPort,
-                                 PoliticaVencimiento politica) {
+                                 PoliticaVencimiento politica, AvisoListaEspera avisoListaEspera) {
         this.reservaRepositoryPort = reservaRepositoryPort;
         this.pagoRepositoryPort = pagoRepositoryPort;
         this.politica = politica;
+        this.avisoListaEspera = avisoListaEspera;
     }
 
     @Override
@@ -30,7 +32,9 @@ public class VencerReservasService implements VencerReservasUseCase {
                 .filter(reserva -> !pagoRepositoryPort.existePagoCompletado(reserva.getId()))
                 .map(reserva -> {
                     reserva.vencer();
-                    return reservaRepositoryPort.guardar(reserva);
+                    Reserva vencida = reservaRepositoryPort.guardar(reserva);
+                    avisoListaEspera.fechasLiberadas(vencida);
+                    return vencida;
                 })
                 .toList();
     }

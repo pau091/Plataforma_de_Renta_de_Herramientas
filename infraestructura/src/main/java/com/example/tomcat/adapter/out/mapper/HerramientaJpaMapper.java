@@ -16,7 +16,8 @@ public class HerramientaJpaMapper {
                 entity.getDescripcion(),
                 entity.getTarifaDiaria(),
                 entity.getEstado(),
-                entity.getImagenUrl()
+                entity.getImagenUrl(),
+                entity.getDeposito()
         );
     }
 
@@ -28,5 +29,6 @@ public class HerramientaJpaMapper {
         entity.setTarifaDiaria(herramienta.getTarifaDiaria());
         entity.setEstado(herramienta.getEstado());
         entity.setImagenUrl(herramienta.getImagenUrl());
+        entity.setDeposito(herramienta.getDeposito());
     }
 }

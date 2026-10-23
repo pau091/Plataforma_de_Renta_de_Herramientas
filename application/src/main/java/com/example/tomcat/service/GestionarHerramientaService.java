@@ -50,7 +50,7 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
 
     @Override
     public Herramienta crear(Solicitante solicitante, Long proveedorId, Long categoriaId, String nombre, String descripcion,
-                             BigDecimal tarifaDiaria, String imagenUrl) {
+                             BigDecimal tarifaDiaria, BigDecimal deposito, String imagenUrl) {
         Long dueno = resolverProveedor(solicitante, proveedorId);
         validarCategoria(categoriaId);
         validarNombre(nombre);
@@ -65,12 +65,15 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
                 "DISPONIBLE",
                 imagenUrl
         );
+        if (deposito != null) {
+            herramienta.cambiarDeposito(deposito);
+        }
         return herramientaRepositoryPort.guardar(herramienta);
     }
 
     @Override
     public Herramienta actualizar(Solicitante solicitante, Long id, Long categoriaId, String nombre, String descripcion,
-                                  BigDecimal tarifaDiaria, String estado, String imagenUrl) {
+                                  BigDecimal tarifaDiaria, BigDecimal deposito, String estado, String imagenUrl) {
         Herramienta herramienta = buscarPropia(solicitante, id);
         Long categoria = categoriaId != null ? categoriaId : herramienta.getCategoriaId();
         validarCategoria(categoria);
@@ -78,6 +81,10 @@ public class GestionarHerramientaService implements GestionarHerramientaUseCase 
         BigDecimal tarifa = tarifaDiaria != null ? validarTarifa(tarifaDiaria) : herramienta.getTarifaDiaria();
 
         herramienta.actualizar(categoria, nombreActualizado, descripcion, tarifa, estado, imagenUrl);
+        if (deposito != null) {
+            // Aplica a los pagos futuros: lo ya cobrado queda guardado en cada reserva.
+            herramienta.cambiarDeposito(deposito);
+        }
         return herramientaRepositoryPort.guardar(herramienta);
     }
 

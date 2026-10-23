@@ -1,6 +1,7 @@
 package com.example.tomcat.adapter.out.mapper;
 
 import com.example.tomcat.adapter.out.persistence.entity.FacturaEntity;
+import com.example.tomcat.adapter.out.persistence.entity.GarantiaEmbeddable;
 import com.example.tomcat.model.Factura;
 import org.springframework.stereotype.Component;
 
@@ -26,7 +27,8 @@ public class FacturaJpaMapper {
                 entity.getTotal(),
                 entity.getMetodoPago(),
                 entity.getFechaEmision(),
-                entity.getEstado()
+                entity.getEstado(),
+                entity.getGarantia() == null ? null : entity.getGarantia().aDominio()
         );
     }
 
@@ -47,6 +49,7 @@ public class FacturaJpaMapper {
         entity.setTotal(factura.getTotal());
         entity.setMetodoPago(factura.getMetodoPago());
         entity.setEstado(factura.getEstado());
+        entity.setGarantia(GarantiaEmbeddable.de(factura.getGarantia()));
         if (factura.getFechaEmision() != null) {
             entity.setFechaEmision(factura.getFechaEmision());
         }

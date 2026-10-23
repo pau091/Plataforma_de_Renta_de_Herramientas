@@ -4,7 +4,7 @@ import { api } from '../api.js';
 import { catalogo as catalogoCliente } from './cliente.js';
 import { barrasPorEstado, cargando, diasAlquiler, fmtFecha, fmtMoneda, html, kpi, toastError, vacio } from '../ui.js';
 import {
-    encabezado, manejarAccionReserva, porId, vistaFacturas, vistaInventario, vistaMantenimientos, vistaReservas,
+    encabezado, manejarAccionReserva, porId, vistaFacturas, vistaInventario, vistaListaEspera, vistaMantenimientos, vistaReservas,
 } from './comun.js';
 
 /** El proveedor no consulta usuarios: los nombres de sus clientes salen de las facturas de sus herramientas. */
@@ -82,6 +82,8 @@ export const misAlquileres = (contenedor, usuario) => vistaReservas(contenedor, 
     rol: 'CLIENTE', clienteId: usuario.usuarioId, titulo: 'Mis alquileres',
     subtitulo: 'Herramientas de otros proveedores que usted reservó. Pague las aceptadas antes de que venza el plazo.',
 });
+
+export const listaEspera = contenedor => vistaListaEspera(contenedor, { destino: '#/mis-alquileres' });
 
 export const misFacturas = (contenedor, usuario) => vistaFacturas(contenedor, {
     clienteId: usuario.usuarioId, titulo: 'Mis pagos y facturas',

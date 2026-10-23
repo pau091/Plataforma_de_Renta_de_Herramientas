@@ -8,6 +8,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -26,6 +27,21 @@ class ReservaTest {
 
     private static Reserva reserva(String estado, LocalDate inicio, LocalDate fin, LocalDateTime creada, LocalDateTime aceptada) {
         return new Reserva(1L, 12L, 3L, inicio, fin, estado, null, null, null, null, creada, aceptada);
+    }
+
+    private static final BigDecimal TARIFA = new BigDecimal("45000");
+    private static final BigDecimal RECARGO = new BigDecimal("0.5");
+    private static final BigDecimal DEPOSITO = new BigDecimal("90000");
+
+    /** Devolución el mismo día de la fecha fin: sin multa. */
+    private static void devolverATiempo(Reserva r, String estado, String observaciones) {
+        r.devolver(estado, observaciones, r.getFechaFin(), TARIFA, RECARGO);
+    }
+
+    /** Reserva entregada (del día +5 al +7) con el depósito retenido. */
+    private static Reserva entregadaConDeposito(BigDecimal deposito) {
+        return new Reserva(1L, 12L, 3L, HOY.plusDays(5), HOY.plusDays(7), "ENTREGADA", AHORA, null, null, null,
+                AHORA.minusDays(1), AHORA.minusDays(1), Garantia.retenida(deposito));
     }
 
     @Test
@@ -53,14 +69,15 @@ class ReservaTest {
             assertThat(r.getEstado()).isEqualTo("ACEPTADA");
             assertThat(r.getFechaAceptacion()).isEqualTo(AHORA);
 
-            r.confirmarPago();
+            r.confirmarPago(DEPOSITO);
             assertThat(r.getEstado()).isEqualTo("CONFIRMADA");
+            assertThat(r.getGarantia().estado()).isEqualTo("RETENIDO");
 
             r.entregar();
             assertThat(r.getEstado()).isEqualTo("ENTREGADA");
             assertThat(r.getFechaEntrega()).isNotNull();
 
-            r.devolver("BUENO", "  Sin novedades  ");
+            devolverATiempo(r, "BUENO", "  Sin novedades  ");
             assertThat(r.getEstado()).isEqualTo("FINALIZADA");
             assertThat(r.getFechaDevolucion()).isNotNull();
             assertThat(r.getEstadoDevolucion()).isEqualTo("BUENO");
@@ -82,7 +99,7 @@ class ReservaTest {
         @Test
         @DisplayName("No se paga una reserva que el proveedor no ha aceptado")
         void noSePagaSinAceptar() {
-            assertThatThrownBy(() -> reserva("PENDIENTE").confirmarPago())
+            assertThatThrownBy(() -> reserva("PENDIENTE").confirmarPago(DEPOSITO))
                     .isInstanceOf(DomainException.class).hasMessageContaining("aceptada por el proveedor");
         }
 
@@ -96,7 +113,7 @@ class ReservaTest {
         @Test
         @DisplayName("No se devuelve lo que no se ha entregado")
         void noSeDevuelveSinEntregar() {
-            assertThatThrownBy(() -> reserva("CONFIRMADA").devolver("BUENO", null))
+            assertThatThrownBy(() -> devolverATiempo(reserva("CONFIRMADA"), "BUENO", null))
                     .isInstanceOf(DomainException.class);
         }
 
@@ -118,19 +135,19 @@ class ReservaTest {
         @CsvSource({"BUENO,BUENO", "danado,DANADO", "DAÑADO,DANADO", "dañado,DANADO", "Perdido,PERDIDO"})
         void normalizaElEstadoDelEquipo(String recibido, String esperado) {
             Reserva r = reserva("ENTREGADA");
-            r.devolver(recibido, null);
+            devolverATiempo(r, recibido, null);
             assertThat(r.getEstadoDevolucion()).isEqualTo(esperado);
         }
 
         @Test
         void detectaDanoYPerdida() {
             Reserva danada = reserva("ENTREGADA");
-            danada.devolver("DANADO", "Cable roto");
+            devolverATiempo(danada, "DANADO", "Cable roto");
             assertThat(danada.tieneDano()).isTrue();
             assertThat(danada.estaPerdida()).isFalse();
 
             Reserva perdida = reserva("ENTREGADA");
-            perdida.devolver("PERDIDO", "");
+            devolverATiempo(perdida, "PERDIDO", "");
             assertThat(perdida.estaPerdida()).isTrue();
             assertThat(perdida.getObservacionesDevolucion()).isNull();
         }
@@ -138,7 +155,113 @@ class ReservaTest {
         @ParameterizedTest(name = "estado del equipo inválido: \"{0}\"")
         @ValueSource(strings = {"ROTO", "regular", " "})
         void rechazaEstadosDesconocidos(String estado) {
-            assertThatThrownBy(() -> reserva("ENTREGADA").devolver(estado, null)).isInstanceOf(DomainException.class);
+            assertThatThrownBy(() -> devolverATiempo(reserva("ENTREGADA"), estado, null)).isInstanceOf(DomainException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("Depósito de garantía y multa por devolución tardía (tarifa 45.000, recargo 50%, depósito 90.000)")
+    class DepositoYMulta {
+
+        @Test
+        @DisplayName("A tiempo y en buen estado: se devuelve el depósito completo")
+        void devueltoCompleto() {
+            Reserva r = entregadaConDeposito(DEPOSITO);
+            devolverATiempo(r, "BUENO", null);
+            Garantia g = r.getGarantia();
+            assertThat(g.estado()).isEqualTo("DEVUELTO");
+            assertThat(g.montoDevuelto()).isEqualByComparingTo("90000");
+            assertThat(g.diasRetraso()).isZero();
+            assertThat(g.multaRetraso()).isEqualByComparingTo("0");
+        }
+
+        @Test
+        @DisplayName("1 día tarde: multa 67.500 (45.000 × 1,5) descontada del depósito → devuelve 22.500")
+        void unDiaTarde() {
+            Reserva r = entregadaConDeposito(DEPOSITO);
+            r.devolver("BUENO", null, r.getFechaFin().plusDays(1), TARIFA, RECARGO);
+            Garantia g = r.getGarantia();
+            assertThat(g.diasRetraso()).isEqualTo(1);
+            assertThat(g.multaRetraso()).isEqualByComparingTo("67500");
+            assertThat(g.montoDevuelto()).isEqualByComparingTo("22500");
+            assertThat(g.saldoPendiente()).isEqualByComparingTo("0");
+            assertThat(g.estado()).isEqualTo("DEVUELTO_PARCIAL");
+        }
+
+        @Test
+        @DisplayName("2 días tarde: la multa (135.000) supera el depósito → no se devuelve y quedan 45.000 de saldo")
+        void multaMayorQueElDeposito() {
+            Reserva r = entregadaConDeposito(DEPOSITO);
+            r.devolver("BUENO", null, r.getFechaFin().plusDays(2), TARIFA, RECARGO);
+            Garantia g = r.getGarantia();
+            assertThat(g.multaRetraso()).isEqualByComparingTo("135000");
+            assertThat(g.montoDevuelto()).isEqualByComparingTo("0");
+            assertThat(g.saldoPendiente()).isEqualByComparingTo("45000");
+            assertThat(g.estado()).isEqualTo("NO_DEVUELTO");
+        }
+
+        @Test
+        @DisplayName("Dañada: queda pendiente hasta conocer el costo de reparación, que se descuenta al cerrarla")
+        void danadaPendienteDeReparacion() {
+            Reserva r = entregadaConDeposito(DEPOSITO);
+            devolverATiempo(r, "DANADO", "Cable roto");
+            assertThat(r.getGarantia().estado()).isEqualTo("PENDIENTE_REPARACION");
+            assertThat(r.getGarantia().enCustodia()).isTrue();
+
+            r.liquidarReparacion(new BigDecimal("30000"));
+            assertThat(r.getGarantia().cargoDanos()).isEqualByComparingTo("30000");
+            assertThat(r.getGarantia().montoDevuelto()).isEqualByComparingTo("60000");
+            assertThat(r.getGarantia().estado()).isEqualTo("DEVUELTO_PARCIAL");
+            assertThatThrownBy(() -> r.liquidarReparacion(BigDecimal.TEN)).isInstanceOf(DomainException.class);
+        }
+
+        @Test
+        @DisplayName("Perdida: el depósito no se devuelve; si además hubo retraso, la multa queda como saldo")
+        void perdida() {
+            Reserva r = entregadaConDeposito(DEPOSITO);
+            r.devolver("PERDIDO", null, r.getFechaFin().plusDays(1), TARIFA, RECARGO);
+            Garantia g = r.getGarantia();
+            assertThat(g.estado()).isEqualTo("NO_DEVUELTO");
+            assertThat(g.montoDevuelto()).isEqualByComparingTo("0");
+            assertThat(g.cargoDanos()).isEqualByComparingTo("90000");
+            assertThat(g.saldoPendiente()).isEqualByComparingTo("67500");
+            assertThat(g.depositoRetenido()).isEqualByComparingTo("90000");
+        }
+
+        @Test
+        @DisplayName("Sin depósito: la multa por retraso queda completa como saldo pendiente")
+        void sinDeposito() {
+            Reserva r = entregadaConDeposito(BigDecimal.ZERO);
+            assertThat(r.getGarantia().estado()).isEqualTo("SIN_DEPOSITO");
+            r.devolver("BUENO", null, r.getFechaFin().plusDays(3), TARIFA, RECARGO);
+            assertThat(r.getGarantia().estado()).isEqualTo("LIQUIDADO");
+            assertThat(r.getGarantia().saldoPendiente()).isEqualByComparingTo("202500");
+        }
+
+        @Test
+        @DisplayName("Reembolso antes de entregar: el depósito se devuelve con el pago")
+        void reembolso() {
+            Reserva r = reserva("ACEPTADA");
+            r.confirmarPago(DEPOSITO);
+            r.cancelarPorReembolso();
+            assertThat(r.getGarantia().estado()).isEqualTo("REEMBOLSADO");
+            assertThat(r.getGarantia().montoDevuelto()).isEqualByComparingTo("90000");
+            assertThat(r.getGarantia().depositoRetenido()).isEqualByComparingTo("0");
+        }
+
+        @Test
+        @DisplayName("Días de retraso: se cuentan desde la fecha fin; devolver antes no da días negativos")
+        void diasRetraso() {
+            Reserva r = reserva("ENTREGADA");
+            assertThat(r.diasRetraso(r.getFechaFin().minusDays(2))).isZero();
+            assertThat(r.diasRetraso(r.getFechaFin().plusDays(4))).isEqualTo(4);
+            assertThat(Reserva.calcularMulta(0, TARIFA, RECARGO)).isEqualByComparingTo("0");
+        }
+
+        @Test
+        @DisplayName("El depósito de garantía no puede ser negativo")
+        void depositoNegativo() {
+            assertThatThrownBy(() -> Garantia.retenida(new BigDecimal("-1"))).isInstanceOf(DomainException.class);
         }
     }
 

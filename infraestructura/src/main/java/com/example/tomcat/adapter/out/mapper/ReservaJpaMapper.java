@@ -1,5 +1,6 @@
 package com.example.tomcat.adapter.out.mapper;
 
+import com.example.tomcat.adapter.out.persistence.entity.GarantiaEmbeddable;
 import com.example.tomcat.adapter.out.persistence.entity.ReservaEntity;
 import com.example.tomcat.model.Reserva;
 import org.springframework.stereotype.Component;
@@ -20,7 +21,8 @@ public class ReservaJpaMapper {
                 entity.getEstadoDevolucion(),
                 entity.getObservacionesDevolucion(),
                 entity.getFechaCreacion(),
-                entity.getFechaAceptacion()
+                entity.getFechaAceptacion(),
+                entity.getGarantia() == null ? null : entity.getGarantia().aDominio()
         );
     }
 
@@ -38,5 +40,6 @@ public class ReservaJpaMapper {
             entity.setFechaCreacion(reserva.getFechaCreacion());
         }
         entity.setFechaAceptacion(reserva.getFechaAceptacion());
+        entity.setGarantia(GarantiaEmbeddable.de(reserva.getGarantia()));
     }
 }

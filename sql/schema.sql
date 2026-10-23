@@ -2,7 +2,7 @@
 -- Plataforma de Renta de Herramientas - Script de creación de la base de datos (MySQL 8)
 -- =====================================================================================================
 -- Esquema final equivalente al que construye Flyway al arrancar la aplicación con las migraciones
--- V1 a V14 (infraestructura/src/main/resources/db/migration). Úselo para crear la base a mano y luego
+-- V1 a V17 (infraestructura/src/main/resources/db/migration). Úselo para crear la base a mano y luego
 -- poblarla con sql/data.sql:
 --     mysql -u root -p < sql/schema.sql
 --     mysql -u root -p < sql/data.sql
@@ -73,9 +73,11 @@ CREATE TABLE herramientas (
     estado        VARCHAR(30) NOT NULL,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     imagen_url    VARCHAR(500) NULL,
+    deposito      DECIMAL(12,2) NOT NULL DEFAULT 0,
     CONSTRAINT fk_herramientas_proveedor FOREIGN KEY (proveedor_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
     CONSTRAINT fk_herramientas_categoria FOREIGN KEY (categoria_id) REFERENCES categorias(id),
     CONSTRAINT chk_herramientas_tarifa CHECK (tarifa_diaria > 0),
+    CONSTRAINT chk_herramientas_deposito CHECK (deposito >= 0),
     CONSTRAINT chk_herramientas_estado CHECK (estado IN ('DISPONIBLE', 'MANTENIMIENTO', 'FUERA_DE_SERVICIO'))
 );
 CREATE INDEX idx_herramientas_proveedor_id ON herramientas(proveedor_id);
@@ -98,11 +100,22 @@ CREATE TABLE reservas (
     estado_devolucion        VARCHAR(50) NULL,
     observaciones_devolucion TEXT NULL,
     version                  BIGINT NOT NULL DEFAULT 0,
+    deposito                 DECIMAL(12,2) NOT NULL DEFAULT 0,
+    estado_deposito          VARCHAR(30) NULL,
+    dias_retraso             INT NOT NULL DEFAULT 0,
+    multa_retraso            DECIMAL(12,2) NOT NULL DEFAULT 0,
+    cargo_danos              DECIMAL(12,2) NOT NULL DEFAULT 0,
+    deposito_devuelto        DECIMAL(12,2) NOT NULL DEFAULT 0,
+    saldo_pendiente          DECIMAL(12,2) NOT NULL DEFAULT 0,
     CONSTRAINT fk_reservas_cliente FOREIGN KEY (cliente_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
     CONSTRAINT fk_reservas_herramienta FOREIGN KEY (herramienta_id) REFERENCES herramientas(id) ON DELETE RESTRICT,
     CONSTRAINT chk_reservas_fechas CHECK (fecha_fin >= fecha_inicio),
     CONSTRAINT chk_reservas_estado CHECK (estado IN ('PENDIENTE', 'ACEPTADA', 'CONFIRMADA', 'ENTREGADA',
                                                      'FINALIZADA', 'RECHAZADA', 'VENCIDA', 'CANCELADA')),
+    CONSTRAINT chk_reservas_estado_deposito CHECK (estado_deposito IS NULL OR estado_deposito IN
+        ('SIN_DEPOSITO', 'RETENIDO', 'PENDIENTE_REPARACION', 'DEVUELTO', 'DEVUELTO_PARCIAL', 'NO_DEVUELTO', 'LIQUIDADO', 'REEMBOLSADO')),
+    CONSTRAINT chk_reservas_garantia_montos CHECK (deposito >= 0 AND dias_retraso >= 0 AND multa_retraso >= 0
+        AND cargo_danos >= 0 AND deposito_devuelto >= 0 AND saldo_pendiente >= 0),
     CONSTRAINT chk_reservas_estado_devolucion CHECK (estado_devolucion IS NULL
                                                      OR estado_devolucion IN ('BUENO', 'DANADO', 'PERDIDO'))
 );
@@ -164,14 +177,81 @@ CREATE TABLE facturas (
     metodo_pago        VARCHAR(50) NOT NULL,
     estado             VARCHAR(20) NOT NULL DEFAULT 'VIGENTE',
     fecha_emision      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deposito                 DECIMAL(12,2) NOT NULL DEFAULT 0,
+    estado_deposito          VARCHAR(30) NULL,
+    dias_retraso             INT NOT NULL DEFAULT 0,
+    multa_retraso            DECIMAL(12,2) NOT NULL DEFAULT 0,
+    cargo_danos              DECIMAL(12,2) NOT NULL DEFAULT 0,
+    deposito_devuelto        DECIMAL(12,2) NOT NULL DEFAULT 0,
+    saldo_pendiente          DECIMAL(12,2) NOT NULL DEFAULT 0,
     CONSTRAINT fk_facturas_pago FOREIGN KEY (pago_id) REFERENCES pagos(id) ON DELETE RESTRICT,
     CONSTRAINT fk_facturas_reserva FOREIGN KEY (reserva_id) REFERENCES reservas(id) ON DELETE RESTRICT,
     CONSTRAINT fk_facturas_cliente FOREIGN KEY (cliente_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
     CONSTRAINT fk_facturas_herramienta FOREIGN KEY (herramienta_id) REFERENCES herramientas(id) ON DELETE RESTRICT,
-    CONSTRAINT chk_facturas_estado CHECK (estado IN ('VIGENTE', 'ANULADA'))
+    CONSTRAINT chk_facturas_estado CHECK (estado IN ('VIGENTE', 'ANULADA')),
+    CONSTRAINT chk_facturas_garantia_montos CHECK (deposito >= 0 AND dias_retraso >= 0 AND multa_retraso >= 0
+        AND cargo_danos >= 0 AND deposito_devuelto >= 0 AND saldo_pendiente >= 0)
 );
 CREATE INDEX idx_facturas_cliente_id ON facturas(cliente_id);
 CREATE INDEX idx_facturas_reserva_id ON facturas(reserva_id);
+
+-- Calificaciones de 1 a 5 estrellas al terminar un alquiler (una por reserva).
+CREATE TABLE calificaciones (
+    id                    BIGINT AUTO_INCREMENT PRIMARY KEY,
+    reserva_id            BIGINT NOT NULL,
+    cliente_id            BIGINT NOT NULL,
+    cliente_nombre        VARCHAR(100) NULL,
+    herramienta_id        BIGINT NOT NULL,
+    proveedor_id          BIGINT NOT NULL,
+    estrellas_herramienta INT NULL,
+    estrellas_proveedor   INT NULL,
+    comentario            VARCHAR(500) NULL,
+    fecha                 TIMESTAMP NOT NULL,
+    -- Una sola reseña por alquiler, aunque lleguen dos peticiones a la vez.
+    CONSTRAINT uk_calificaciones_reserva UNIQUE (reserva_id),
+    CONSTRAINT fk_calificaciones_reserva FOREIGN KEY (reserva_id) REFERENCES reservas(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_calificaciones_cliente FOREIGN KEY (cliente_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_calificaciones_herramienta FOREIGN KEY (herramienta_id) REFERENCES herramientas(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_calificaciones_proveedor FOREIGN KEY (proveedor_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
+    CONSTRAINT chk_calificaciones_estrellas CHECK ((estrellas_herramienta IS NULL OR estrellas_herramienta BETWEEN 1 AND 5)
+        AND (estrellas_proveedor IS NULL OR estrellas_proveedor BETWEEN 1 AND 5)
+        AND (estrellas_herramienta IS NOT NULL OR estrellas_proveedor IS NOT NULL))
+);
+CREATE INDEX idx_calificaciones_herramienta ON calificaciones(herramienta_id);
+CREATE INDEX idx_calificaciones_proveedor ON calificaciones(proveedor_id);
+
+-- Lista de espera de fechas ocupadas y notificaciones de la campana.
+CREATE TABLE lista_espera (
+    id             BIGINT AUTO_INCREMENT PRIMARY KEY,
+    herramienta_id BIGINT NOT NULL,
+    cliente_id     BIGINT NOT NULL,
+    fecha_inicio   DATE NOT NULL,
+    fecha_fin      DATE NOT NULL,
+    estado         VARCHAR(20) NOT NULL DEFAULT 'ESPERANDO',
+    creada_en      TIMESTAMP NOT NULL,
+    notificada_en  TIMESTAMP NULL,
+    -- No es historial contable: si se elimina la herramienta o el usuario, sus esperas se eliminan con ellos.
+    CONSTRAINT fk_lista_espera_herramienta FOREIGN KEY (herramienta_id) REFERENCES herramientas(id) ON DELETE CASCADE,
+    CONSTRAINT fk_lista_espera_cliente FOREIGN KEY (cliente_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    CONSTRAINT chk_lista_espera_fechas CHECK (fecha_fin >= fecha_inicio),
+    CONSTRAINT chk_lista_espera_estado CHECK (estado IN ('ESPERANDO', 'NOTIFICADA', 'ATENDIDA', 'CANCELADA'))
+);
+CREATE INDEX idx_lista_espera_fila ON lista_espera(herramienta_id, estado, creada_en);
+
+-- Avisos que el usuario ve en la campana de la página.
+CREATE TABLE notificaciones (
+    id             BIGINT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id     BIGINT NOT NULL,
+    tipo           VARCHAR(30) NOT NULL,
+    titulo         VARCHAR(150) NOT NULL,
+    mensaje        VARCHAR(500) NOT NULL,
+    herramienta_id BIGINT NULL,
+    leida          BOOLEAN NOT NULL DEFAULT FALSE,
+    creada_en      TIMESTAMP NOT NULL,
+    CONSTRAINT fk_notificaciones_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    CONSTRAINT fk_notificaciones_herramienta FOREIGN KEY (herramienta_id) REFERENCES herramientas(id) ON DELETE SET NULL
+);
+CREATE INDEX idx_notificaciones_usuario ON notificaciones(usuario_id, leida, creada_en);
 
 -- Tokens JWT emitidos y lista negra de tokens revocados (suspensión, baneo, desactivación o cierre de sesión).
 CREATE TABLE tokens_emitidos (

@@ -1,4 +1,4 @@
-%% Diagrama relacional de renta_herramientas_db (esquema final: sql/schema.sql = migraciones V1-V14).
+%% Diagrama relacional de renta_herramientas_db (esquema final: sql/schema.sql = migraciones V1-V17).
 %% Imagen generada: docs/diagrama-er.png
 erDiagram
     ROLES ||--o{ USUARIO_ROLES : "se asigna en"
@@ -14,6 +14,11 @@ erDiagram
     HERRAMIENTAS ||--o{ FACTURAS : "se factura en"
     HERRAMIENTAS ||--o{ MANTENIMIENTOS : "recibe"
     RESERVAS |o--o{ MANTENIMIENTOS : "daño reportado en"
+    RESERVAS ||--o| CALIFICACIONES : "se califica en"
+    HERRAMIENTAS ||--o{ CALIFICACIONES : "recibe"
+    HERRAMIENTAS ||--o{ LISTA_ESPERA : "tiene en espera"
+    USUARIOS ||--o{ LISTA_ESPERA : "espera (cliente)"
+    USUARIOS ||--o{ NOTIFICACIONES : "recibe"
     USUARIOS ||--o{ TOKENS_EMITIDOS : "inicia sesión con"
     USUARIOS ||--o{ TOKENS_REVOCADOS : "lista negra"
 
@@ -50,6 +55,7 @@ erDiagram
         decimal tarifa_diaria "mayor que 0"
         varchar estado "DISPONIBLE, MANTENIMIENTO, FUERA_DE_SERVICIO"
         varchar imagen_url
+        decimal deposito "lo fija el proveedor"
         timestamp created_at
     }
     RESERVAS {
@@ -66,6 +72,41 @@ erDiagram
         varchar estado_devolucion "BUENO, DANADO, PERDIDO"
         text observaciones_devolucion
         bigint version "bloqueo optimista (@Version)"
+        decimal deposito "garantía cobrada con el pago"
+        varchar estado_deposito "RETENIDO, DEVUELTO..."
+        int dias_retraso
+        decimal multa_retraso
+        decimal cargo_danos
+        decimal deposito_devuelto
+        decimal saldo_pendiente
+    }
+    CALIFICACIONES {
+        bigint id PK
+        bigint reserva_id FK,UK "una por alquiler"
+        bigint cliente_id FK
+        bigint herramienta_id FK
+        bigint proveedor_id FK
+        int estrellas_herramienta "1 a 5"
+        int estrellas_proveedor "1 a 5"
+        varchar comentario
+        timestamp fecha
+    }
+    LISTA_ESPERA {
+        bigint id PK
+        bigint herramienta_id FK
+        bigint cliente_id FK
+        date fecha_inicio
+        date fecha_fin
+        varchar estado "ESPERANDO, NOTIFICADA..."
+        timestamp creada_en "orden de la fila"
+    }
+    NOTIFICACIONES {
+        bigint id PK
+        bigint usuario_id FK
+        varchar titulo
+        varchar mensaje
+        boolean leida
+        timestamp creada_en
     }
     TOKENS_EMITIDOS {
         varchar jti PK "id único del JWT"
@@ -107,6 +148,7 @@ erDiagram
         varchar metodo_pago
         varchar estado "VIGENTE, ANULADA"
         timestamp fecha_emision
+        decimal deposito "+ copia de la liquidación (multa, daños, saldo)"
     }
     MANTENIMIENTOS {
         bigint id PK

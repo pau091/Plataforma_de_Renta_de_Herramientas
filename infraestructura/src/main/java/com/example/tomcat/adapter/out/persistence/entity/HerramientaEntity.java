@@ -31,6 +31,10 @@ public class HerramientaEntity {
     @Column(name = "imagen_url")
     private String imagenUrl;
 
+    /** Depósito de garantía que fija el proveedor (0 = sin depósito). */
+    @Column(nullable = false)
+    private BigDecimal deposito = BigDecimal.ZERO;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getProveedorId() { return proveedorId; }
@@ -47,4 +51,6 @@ public class HerramientaEntity {
     public void setEstado(String estado) { this.estado = estado; }
     public String getImagenUrl() { return imagenUrl; }
     public void setImagenUrl(String imagenUrl) { this.imagenUrl = imagenUrl; }
+    public BigDecimal getDeposito() { return deposito; }
+    public void setDeposito(BigDecimal deposito) { this.deposito = deposito; }
 }

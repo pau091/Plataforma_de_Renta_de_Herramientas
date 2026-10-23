@@ -16,12 +16,14 @@ public class GestionarPagoService implements GestionarPagoUseCase {
     private final PagoRepositoryPort pagoRepositoryPort;
     private final ReservaRepositoryPort reservaRepositoryPort;
     private final FacturaRepositoryPort facturaRepositoryPort;
+    private final AvisoListaEspera avisoListaEspera;
 
     public GestionarPagoService(PagoRepositoryPort pagoRepositoryPort, ReservaRepositoryPort reservaRepositoryPort,
-                                FacturaRepositoryPort facturaRepositoryPort) {
+                                FacturaRepositoryPort facturaRepositoryPort, AvisoListaEspera avisoListaEspera) {
         this.pagoRepositoryPort = pagoRepositoryPort;
         this.reservaRepositoryPort = reservaRepositoryPort;
         this.facturaRepositoryPort = facturaRepositoryPort;
+        this.avisoListaEspera = avisoListaEspera;
     }
 
     @Override
@@ -48,9 +50,10 @@ public class GestionarPagoService implements GestionarPagoUseCase {
         reserva.cancelarPorReembolso();
 
         Pago reembolsado = pagoRepositoryPort.guardar(pago);
-        reservaRepositoryPort.guardar(reserva);
+        avisoListaEspera.fechasLiberadas(reservaRepositoryPort.guardar(reserva));
         facturaRepositoryPort.buscarPorPagoId(id).ifPresent(factura -> {
             factura.anular();
+            factura.registrarLiquidacion(reserva.getGarantia());
             facturaRepositoryPort.guardar(factura);
         });
         return reembolsado;

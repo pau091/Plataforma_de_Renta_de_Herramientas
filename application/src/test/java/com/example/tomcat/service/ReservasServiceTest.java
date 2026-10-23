@@ -4,10 +4,13 @@ import com.example.tomcat.exception.AccesoDenegadoException;
 import com.example.tomcat.exception.ConflictoException;
 import com.example.tomcat.exception.DomainException;
 import com.example.tomcat.exception.RecursoNoEncontradoException;
+import com.example.tomcat.model.Factura;
+import com.example.tomcat.model.Garantia;
 import com.example.tomcat.model.Herramienta;
 import com.example.tomcat.model.Mantenimiento;
 import com.example.tomcat.model.Reserva;
 import com.example.tomcat.model.Rol;
+import com.example.tomcat.repository.FacturaRepositoryPort;
 import com.example.tomcat.repository.HerramientaRepositoryPort;
 import com.example.tomcat.repository.MantenimientoRepositoryPort;
 import com.example.tomcat.repository.PagoRepositoryPort;
@@ -56,6 +59,12 @@ class ReservasServiceTest {
     MantenimientoRepositoryPort mantenimientos;
     @Mock
     PagoRepositoryPort pagos;
+    @Mock
+    FacturaRepositoryPort facturas;
+    @Mock
+    com.example.tomcat.repository.ListaEsperaRepositoryPort listaEspera;
+    @Mock
+    AvisoListaEspera avisoListaEspera;
 
     CrearReservaService crear;
     GestionarReservaService gestionar;
@@ -64,9 +73,10 @@ class ReservasServiceTest {
 
     @BeforeEach
     void preparar() {
-        crear = new CrearReservaService(herramientas, usuarios, reservas, POLITICA);
-        gestionar = new GestionarReservaService(reservas, herramientas, mantenimientos, new ControlAcceso(herramientas), POLITICA);
-        vencer = new VencerReservasService(reservas, pagos, POLITICA);
+        crear = new CrearReservaService(herramientas, usuarios, reservas, POLITICA, listaEspera);
+        gestionar = new GestionarReservaService(reservas, herramientas, mantenimientos, new ControlAcceso(herramientas), POLITICA,
+                facturas, new java.math.BigDecimal("0.5"), avisoListaEspera);
+        vencer = new VencerReservasService(reservas, pagos, POLITICA, avisoListaEspera);
         taladro = herramienta("DISPONIBLE");
         when(herramientas.buscarPorId(HERRAMIENTA_ID)).thenReturn(Optional.of(taladro));
         when(herramientas.bloquearPorId(HERRAMIENTA_ID)).thenReturn(Optional.of(taladro));
@@ -225,6 +235,28 @@ class ReservasServiceTest {
         }
 
         @Test
+        @DisplayName("Devolución 2 días tarde: multa 135.000 (2 × 45.000 × 1,5) descontada del depósito y reflejada en la factura")
+        void devolucionTardia() {
+            existe(new Reserva(1L, CLIENTE_ID, HERRAMIENTA_ID, HOY.minusDays(5), HOY.minusDays(2), "ENTREGADA",
+                    AHORA_UTC.minusDays(5), null, null, null, AHORA_UTC.minusDays(6), AHORA_UTC.minusDays(6),
+                    Garantia.retenida(new java.math.BigDecimal("90000"))));
+            Factura factura = new Factura(9L, "FAC-000009", 9L, 1L, CLIENTE_ID, "Juan", "juan@correo.com", HERRAMIENTA_ID,
+                    "Taladro", HOY.minusDays(5), HOY.minusDays(2), 4, new java.math.BigDecimal("45000"),
+                    new java.math.BigDecimal("180000"), new java.math.BigDecimal("270000"), "TARJETA", null, null);
+            when(facturas.buscarPorReservaId(1L)).thenReturn(Optional.of(factura));
+
+            Reserva r = gestionar.devolver(PROVEEDOR, 1L, "BUENO", null);
+
+            Garantia g = r.getGarantia();
+            assertThat(g.diasRetraso()).isEqualTo(2);
+            assertThat(g.multaRetraso()).isEqualByComparingTo("135000");
+            assertThat(g.montoDevuelto()).isEqualByComparingTo("0");
+            assertThat(g.saldoPendiente()).isEqualByComparingTo("45000");
+            verify(facturas).guardar(factura);
+            assertThat(factura.getGarantia().multaRetraso()).isEqualByComparingTo("135000");
+        }
+
+        @Test
         @DisplayName("Devolución en buen estado: la herramienta sigue igual")
         void devolucionEnBuenEstado() {
             existe(reserva(1L, "ENTREGADA"));
@@ -266,7 +298,9 @@ class ReservasServiceTest {
             assertThatThrownBy(() -> gestionar.cancelar(OTRO_CLIENTE, 1L)).isInstanceOf(AccesoDenegadoException.class);
             assertThatThrownBy(() -> gestionar.modificarFechas(PROVEEDOR, 1L, HOY.plusDays(9), HOY.plusDays(9)))
                     .isInstanceOf(AccesoDenegadoException.class);
-            assertThat(gestionar.cancelar(CLIENTE, 1L).getEstado()).isEqualTo("CANCELADA");
+            Reserva cancelada = gestionar.cancelar(CLIENTE, 1L);
+            assertThat(cancelada.getEstado()).isEqualTo("CANCELADA");
+            verify(avisoListaEspera).fechasLiberadas(cancelada);   // se avisa al primero de la lista de espera
         }
 
         @Test

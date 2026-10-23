@@ -2,6 +2,8 @@ package com.example.tomcat.model;
 
 import com.example.tomcat.exception.DomainException;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -14,6 +16,8 @@ import java.util.Set;
  * PENDIENTE puede pasar a RECHAZADA; PENDIENTE y ACEPTADA pueden pasar a VENCIDA si se agota el plazo.
  * El cliente puede cancelar una reserva PENDIENTE o ACEPTADA (CANCELADA); una CONFIRMADA solo se cancela
  * cuando el administrador reembolsa su pago antes de la entrega.
+ * Al pagar se cobra el depósito de garantía ({@link Garantia}); al devolver se liquida, descontando la multa por
+ * retraso (si se devuelve después de la fecha fin) y los daños.
  */
 public class Reserva {
     private static final Set<String> ESTADOS_DEVOLUCION = Set.of("BUENO", "DANADO", "PERDIDO");
@@ -30,10 +34,19 @@ public class Reserva {
     private String observacionesDevolucion;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaAceptacion;
+    private Garantia garantia;
 
     public Reserva(Long id, Long clienteId, Long herramientaId, LocalDate fechaInicio, LocalDate fechaFin, String estado,
                    LocalDateTime fechaEntrega, LocalDateTime fechaDevolucion, String estadoDevolucion,
                    String observacionesDevolucion, LocalDateTime fechaCreacion, LocalDateTime fechaAceptacion) {
+        this(id, clienteId, herramientaId, fechaInicio, fechaFin, estado, fechaEntrega, fechaDevolucion, estadoDevolucion,
+                observacionesDevolucion, fechaCreacion, fechaAceptacion, null);
+    }
+
+    public Reserva(Long id, Long clienteId, Long herramientaId, LocalDate fechaInicio, LocalDate fechaFin, String estado,
+                   LocalDateTime fechaEntrega, LocalDateTime fechaDevolucion, String estadoDevolucion,
+                   String observacionesDevolucion, LocalDateTime fechaCreacion, LocalDateTime fechaAceptacion,
+                   Garantia garantia) {
         this.id = id;
         this.clienteId = clienteId;
         this.herramientaId = herramientaId;
@@ -46,6 +59,7 @@ public class Reserva {
         this.observacionesDevolucion = observacionesDevolucion;
         this.fechaCreacion = fechaCreacion;
         this.fechaAceptacion = fechaAceptacion;
+        this.garantia = garantia != null ? garantia : Garantia.sinCobrar();
     }
 
     public Long getId() { return id; }
@@ -60,9 +74,25 @@ public class Reserva {
     public String getObservacionesDevolucion() { return observacionesDevolucion; }
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }
     public LocalDateTime getFechaAceptacion() { return fechaAceptacion; }
+    public Garantia getGarantia() { return garantia; }
 
     public long diasAlquiler() {
         return ChronoUnit.DAYS.between(fechaInicio, fechaFin) + 1;
+    }
+
+    /** Días que pasaron desde la fecha fin hasta {@code dia}; 0 si se devuelve a tiempo. */
+    public long diasRetraso(LocalDate dia) {
+        return Math.max(0, ChronoUnit.DAYS.between(fechaFin, dia));
+    }
+
+    /** Multa por devolución tardía: cada día de retraso cuesta la tarifa diaria más el recargo (0,5 = 50%). */
+    public static BigDecimal calcularMulta(long diasRetraso, BigDecimal tarifaDiaria, BigDecimal recargoMora) {
+        if (diasRetraso <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return tarifaDiaria.multiply(BigDecimal.ONE.add(recargoMora))
+                .multiply(BigDecimal.valueOf(diasRetraso))
+                .setScale(0, RoundingMode.HALF_UP);
     }
 
     /** Reglas de fechas comunes al crear y al modificar una reserva. */
@@ -101,6 +131,7 @@ public class Reserva {
     public void cancelarPorReembolso() {
         exigirEstado("CONFIRMADA", "Solo se puede reembolsar el pago de reservas confirmadas que aún no se han entregado.");
         this.estado = "CANCELADA";
+        this.garantia = garantia.reembolsada();
     }
 
     public void aceptar(LocalDateTime ahora) {
@@ -109,10 +140,11 @@ public class Reserva {
         this.fechaAceptacion = ahora;
     }
 
-    /** Confirmación automática: ocurre en el momento en que el cliente paga una reserva aceptada. */
-    public void confirmarPago() {
+    /** Confirmación automática al pagar una reserva aceptada; el depósito de garantía queda retenido. */
+    public void confirmarPago(BigDecimal deposito) {
         exigirEstado("ACEPTADA", "La reserva debe estar aceptada por el proveedor para poder pagarla.");
         this.estado = "CONFIRMADA";
+        this.garantia = Garantia.retenida(deposito);
     }
 
     public void rechazar() {
@@ -126,16 +158,34 @@ public class Reserva {
         this.fechaEntrega = LocalDateTime.now();
     }
 
-    public void devolver(String estadoEquipo, String observaciones) {
+    /**
+     * Registra la devolución y liquida el depósito: si se devuelve después de la fecha fin, cada día de retraso genera
+     * una multa ({@link #calcularMulta}); la multa y los daños se descuentan del depósito.
+     *
+     * @param hoy          día de la devolución (zona del negocio)
+     * @param tarifaDiaria tarifa de la herramienta, base de la multa
+     * @param recargoMora  recargo sobre la tarifa por día de retraso (0,5 = 50%)
+     */
+    public void devolver(String estadoEquipo, String observaciones, LocalDate hoy, BigDecimal tarifaDiaria,
+                         BigDecimal recargoMora) {
         exigirEstado("ENTREGADA", "Solo se pueden devolver herramientas ya entregadas.");
         String estadoNormalizado = normalizarEstadoDevolucion(estadoEquipo);
         if (!ESTADOS_DEVOLUCION.contains(estadoNormalizado)) {
             throw new DomainException("Estado de devolución no válido. Use BUENO, DANADO o PERDIDO.");
         }
+        long dias = diasRetraso(hoy);
+        // Reservas pagadas antes de existir el depósito no tienen garantía registrada: se liquidan sin depósito.
+        Garantia base = garantia.estado() == null ? Garantia.retenida(BigDecimal.ZERO) : garantia;
+        this.garantia = base.liquidarDevolucion(estadoNormalizado, dias, calcularMulta(dias, tarifaDiaria, recargoMora));
         this.estadoDevolucion = estadoNormalizado;
         this.observacionesDevolucion = observaciones == null || observaciones.isBlank() ? null : observaciones.trim();
         this.fechaDevolucion = LocalDateTime.now();
         this.estado = "FINALIZADA";
+    }
+
+    /** Se cerró la reparación de una devolución con daño: el costo real se descuenta del depósito. */
+    public void liquidarReparacion(BigDecimal costoReparacion) {
+        this.garantia = garantia.liquidarReparacion(costoReparacion);
     }
 
     /**

@@ -11,10 +11,12 @@ public interface GestionarHerramientaUseCase {
      * Si el solicitante es PROVEEDOR la herramienta se registra a su nombre; si es ADMIN
      * debe indicar el proveedorId del dueño.
      */
+    /** deposito: depósito de garantía que se cobra con el alquiler; null o 0 = sin depósito. */
     Herramienta crear(Solicitante solicitante, Long proveedorId, Long categoriaId, String nombre, String descripcion,
-                      BigDecimal tarifaDiaria, String imagenUrl);
+                      BigDecimal tarifaDiaria, BigDecimal deposito, String imagenUrl);
+    /** Los campos null no cambian. */
     Herramienta actualizar(Solicitante solicitante, Long id, Long categoriaId, String nombre, String descripcion,
-                           BigDecimal tarifaDiaria, String estado, String imagenUrl);
+                           BigDecimal tarifaDiaria, BigDecimal deposito, String estado, String imagenUrl);
     void eliminar(Solicitante solicitante, Long id);
     Herramienta cambiarEstado(Solicitante solicitante, Long id, String estado);
     Herramienta actualizarImagen(Solicitante solicitante, Long id, String imagenUrl);

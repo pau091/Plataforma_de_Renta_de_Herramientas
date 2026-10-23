@@ -16,9 +16,16 @@ public class Herramienta {
     private BigDecimal tarifaDiaria;
     private String estado;
     private String imagenUrl;
+    /** Depósito de garantía que fija el proveedor; se cobra con el alquiler y se liquida al devolver (0 = sin depósito). */
+    private BigDecimal deposito;
 
     public Herramienta(Long id, Long proveedorId, Long categoriaId, String nombre, String descripcion,
                        BigDecimal tarifaDiaria, String estado, String imagenUrl) {
+        this(id, proveedorId, categoriaId, nombre, descripcion, tarifaDiaria, estado, imagenUrl, BigDecimal.ZERO);
+    }
+
+    public Herramienta(Long id, Long proveedorId, Long categoriaId, String nombre, String descripcion,
+                       BigDecimal tarifaDiaria, String estado, String imagenUrl, BigDecimal deposito) {
         this.id = id;
         this.proveedorId = proveedorId;
         this.categoriaId = categoriaId;
@@ -27,6 +34,7 @@ public class Herramienta {
         this.tarifaDiaria = tarifaDiaria;
         this.estado = estado != null ? estado : "DISPONIBLE";
         this.imagenUrl = imagenUrl;
+        this.deposito = deposito != null ? deposito : BigDecimal.ZERO;
     }
 
     public Long getId() { return id; }
@@ -37,6 +45,7 @@ public class Herramienta {
     public BigDecimal getTarifaDiaria() { return tarifaDiaria; }
     public String getEstado() { return estado; }
     public String getImagenUrl() { return imagenUrl; }
+    public BigDecimal getDeposito() { return deposito; }
 
     public boolean estaDisponible() {
         return "DISPONIBLE".equals(estado);
@@ -62,6 +71,13 @@ public class Herramienta {
             throw new DomainException("Estado de herramienta no válido. Use DISPONIBLE, MANTENIMIENTO o FUERA_DE_SERVICIO.");
         }
         this.estado = nuevoEstado;
+    }
+
+    public void cambiarDeposito(BigDecimal nuevoDeposito) {
+        if (nuevoDeposito == null || nuevoDeposito.signum() < 0) {
+            throw new DomainException("El depósito de garantía no puede ser negativo (use 0 si no exige depósito).");
+        }
+        this.deposito = nuevoDeposito;
     }
 
     public void actualizarImagen(String imagenUrl) {

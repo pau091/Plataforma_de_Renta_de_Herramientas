@@ -13,6 +13,7 @@ import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -93,6 +94,7 @@ public class HerramientaController {
                 request.nombre(),
                 request.descripcion(),
                 request.tarifaDiaria(),
+                request.deposito(),
                 request.imagenUrl()
         ));
     }
@@ -115,6 +117,7 @@ public class HerramientaController {
                 request.nombre(),
                 request.descripcion(),
                 request.tarifaDiaria(),
+                request.deposito(),
                 request.estado(),
                 request.imagenUrl()
         ));
@@ -194,6 +197,11 @@ public class HerramientaController {
             @Positive(message = "La tarifa diaria debe ser mayor que cero.")
             @Digits(integer = 10, fraction = 2, message = "La tarifa admite hasta 10 enteros y 2 decimales.")
             BigDecimal tarifaDiaria,
+            @Schema(example = "50000", description = "Depósito de garantía que se cobra con el alquiler y se devuelve al "
+                    + "recibir la herramienta en buen estado. Opcional: 0 o vacío = sin depósito")
+            @PositiveOrZero(message = "El depósito no puede ser negativo.")
+            @Digits(integer = 10, fraction = 2, message = "El depósito admite hasta 10 enteros y 2 decimales.")
+            BigDecimal deposito,
             @Schema(example = "https://images.example.com/esmeriladora.jpg", description = "Opcional: URL externa de la imagen")
             @Size(max = 500, message = "La URL de la imagen admite máximo 500 caracteres.")
             String imagenUrl
@@ -212,6 +220,10 @@ public class HerramientaController {
             @Positive(message = "La tarifa diaria debe ser mayor que cero.")
             @Digits(integer = 10, fraction = 2, message = "La tarifa admite hasta 10 enteros y 2 decimales.")
             BigDecimal tarifaDiaria,
+            @Schema(example = "56000", description = "Nuevo depósito de garantía (aplica a los pagos futuros)")
+            @PositiveOrZero(message = "El depósito no puede ser negativo.")
+            @Digits(integer = 10, fraction = 2, message = "El depósito admite hasta 10 enteros y 2 decimales.")
+            BigDecimal deposito,
             @Schema(example = "DISPONIBLE", allowableValues = {"DISPONIBLE", "MANTENIMIENTO", "FUERA_DE_SERVICIO"})
             String estado,
             @Schema(example = "https://images.example.com/esmeriladora-v2.jpg")

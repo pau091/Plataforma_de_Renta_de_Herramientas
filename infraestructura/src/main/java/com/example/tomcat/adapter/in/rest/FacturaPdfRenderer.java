@@ -1,6 +1,7 @@
 package com.example.tomcat.adapter.in.rest;
 
 import com.example.tomcat.model.Factura;
+import com.example.tomcat.model.Garantia;
 import org.openpdf.text.Document;
 import org.openpdf.text.Element;
 import org.openpdf.text.Font;
@@ -75,6 +76,10 @@ public class FacturaPdfRenderer {
         documento.add(cliente(factura));
         documento.add(detalle(factura));
         documento.add(totales(factura));
+        Garantia garantia = factura.getGarantia();
+        if (garantia.liquidada() || garantia.pendienteReparacion()) {
+            documento.add(liquidacion(garantia));
+        }
 
         Paragraph pie = new Paragraph("Comprobante generado automáticamente al confirmar el pago de la reserva #"
                 + factura.getReservaId() + ". Las fechas del alquiler incluyen el día de inicio y el de fin.", PEQUENA);
@@ -148,8 +153,12 @@ public class FacturaPdfRenderer {
         tabla.setWidthPercentage(55);
         tabla.setHorizontalAlignment(Element.ALIGN_RIGHT);
         tabla.setSpacingBefore(12);
-        tabla.addCell(sinBorde(new Phrase("Subtotal", NORMAL)));
+        tabla.addCell(sinBorde(new Phrase("Alquiler", NORMAL)));
         tabla.addCell(derechaSinBorde(new Phrase(pesos(factura.getSubtotal()), NORMAL)));
+        if (factura.getGarantia().deposito().signum() > 0) {
+            tabla.addCell(sinBorde(new Phrase("Depósito de garantía", NORMAL)));
+            tabla.addCell(derechaSinBorde(new Phrase(pesos(factura.getGarantia().deposito()), NORMAL)));
+        }
         tabla.addCell(sinBorde(new Phrase("Método de pago", NORMAL)));
         tabla.addCell(derechaSinBorde(new Phrase(factura.getMetodoPago(), NORMAL)));
 
@@ -163,6 +172,43 @@ public class FacturaPdfRenderer {
             tabla.addCell(celda);
         }
         return tabla;
+    }
+
+    /** Lo que pasó con el depósito al devolver: multa por retraso, daños, lo devuelto y lo que falta pagar. */
+    private PdfPTable liquidacion(Garantia g) {
+        PdfPTable tabla = new PdfPTable(new float[]{1.3f, 1.7f});
+        tabla.setWidthPercentage(55);
+        tabla.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        tabla.setSpacingBefore(18);
+        PdfPCell titulo = sinBorde(new Phrase("Liquidación del depósito", SUBTITULO));
+        titulo.setColspan(2);
+        tabla.addCell(titulo);
+        fila(tabla, "Estado", ESTADOS_DEPOSITO.getOrDefault(g.estado(), g.estado()), NORMAL);
+        if (g.diasRetraso() > 0) {
+            fila(tabla, "Devolución tardía", g.diasRetraso() + (g.diasRetraso() == 1 ? " día" : " días") + " de retraso", ANULADA);
+            fila(tabla, "Multa por retraso", pesos(g.multaRetraso()), ANULADA);
+        }
+        if (g.cargoDanos().signum() > 0) {
+            fila(tabla, "Daños / pérdida", pesos(g.cargoDanos()), NORMAL);
+        }
+        if (g.pendienteReparacion()) {
+            fila(tabla, "Daños", "pendiente del costo de reparación", NORMAL);
+        } else {
+            fila(tabla, "Depósito devuelto", pesos(g.montoDevuelto()), NEGRITA);
+        }
+        if (g.saldoPendiente().signum() > 0) {
+            fila(tabla, "Saldo pendiente a cargo del cliente", pesos(g.saldoPendiente()), ANULADA);
+        }
+        return tabla;
+    }
+
+    private static final java.util.Map<String, String> ESTADOS_DEPOSITO = java.util.Map.of(
+            "DEVUELTO", "Devuelto completo", "DEVUELTO_PARCIAL", "Devuelto en parte", "NO_DEVUELTO", "No devuelto",
+            "PENDIENTE_REPARACION", "Pendiente de reparación", "LIQUIDADO", "Sin depósito", "REEMBOLSADO", "Reembolsado con el pago");
+
+    private static void fila(PdfPTable tabla, String etiqueta, String valor, Font fuente) {
+        tabla.addCell(sinBorde(new Phrase(etiqueta, NORMAL)));
+        tabla.addCell(derechaSinBorde(new Phrase(valor, fuente)));
     }
 
     private void marcaDeAgua(PdfContentByte lienzo, Rectangle pagina) {

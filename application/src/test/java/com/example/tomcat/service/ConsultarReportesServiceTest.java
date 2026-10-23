@@ -1,5 +1,6 @@
 package com.example.tomcat.service;
 
+import com.example.tomcat.model.Garantia;
 import com.example.tomcat.model.Herramienta;
 import com.example.tomcat.model.Mantenimiento;
 import com.example.tomcat.model.Reserva;
@@ -7,6 +8,7 @@ import com.example.tomcat.model.Rol;
 import com.example.tomcat.port.in.dto.ReporteClientesFrecuentes;
 import com.example.tomcat.port.in.dto.ReporteIncidencias;
 import com.example.tomcat.port.in.dto.ReporteIngresos;
+import com.example.tomcat.port.in.dto.ReporteMultas;
 import com.example.tomcat.port.in.dto.ReporteRentabilidad;
 import com.example.tomcat.repository.HerramientaRepositoryPort;
 import com.example.tomcat.repository.MantenimientoRepositoryPort;
@@ -89,6 +91,35 @@ class ConsultarReportesServiceTest {
         ReporteIngresos r = reportes.ingresos();
         assertThat(r.totalIngresos()).isEqualByComparingTo("275000");
         assertThat(r.pagosCompletados()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("El depósito en custodia no es ingreso; la multa sí, y lo no cubierto queda como saldo por cobrar")
+    void ingresosConDepositoYMulta() {
+        Garantia liquidada = Garantia.retenida(new BigDecimal("90000"))
+                .liquidarDevolucion("BUENO", 1, new BigDecimal("67500"));            // devuelve 22.500
+        Garantia enCustodia = Garantia.retenida(new BigDecimal("50000"));
+        when(reservas.listar()).thenReturn(List.of(
+                new Reserva(6L, CLIENTE_ID, 1L, HOY.minusDays(4), HOY.minusDays(3), "FINALIZADA", null, null, "BUENO", null,
+                        AHORA_UTC.minusDays(5), null, liquidada),
+                new Reserva(7L, CLIENTE_ID, 2L, HOY, HOY.plusDays(3), "ENTREGADA", null, null, null, null,
+                        AHORA_UTC.minusDays(1), null, enCustodia)));
+        when(pagos.listar()).thenReturn(List.of(
+                pago(6L, 6L, "180000", "COMPLETADO"),    // 90.000 de alquiler + 90.000 de depósito
+                pago(7L, 7L, "150000", "COMPLETADO")));  // 100.000 de alquiler + 50.000 de depósito
+
+        ReporteIngresos r = reportes.ingresos();
+
+        assertThat(r.ingresosAlquiler()).isEqualByComparingTo("190000");
+        assertThat(r.ingresosMultas()).isEqualByComparingTo("67500");
+        assertThat(r.totalIngresos()).isEqualByComparingTo("257500");
+        assertThat(r.depositosEnCustodia()).isEqualByComparingTo("50000");
+        assertThat(r.depositosDevueltos()).isEqualByComparingTo("22500");
+
+        ReporteMultas multas = reportes.multas();
+        assertThat(multas.devolucionesTardias()).isEqualTo(1);
+        assertThat(multas.totalMultas()).isEqualByComparingTo("67500");
+        assertThat(multas.items().get(0).herramientaNombre()).isEqualTo("Taladro Percutor");
     }
 
     @Test

@@ -8,6 +8,7 @@ import com.example.tomcat.model.Mantenimiento;
 import com.example.tomcat.model.Reserva;
 import com.example.tomcat.port.in.GestionarMantenimientoUseCase;
 import com.example.tomcat.port.in.dto.Solicitante;
+import com.example.tomcat.repository.FacturaRepositoryPort;
 import com.example.tomcat.repository.HerramientaRepositoryPort;
 import com.example.tomcat.repository.MantenimientoRepositoryPort;
 import com.example.tomcat.repository.ReservaRepositoryPort;
@@ -21,17 +22,20 @@ public class GestionarMantenimientoService implements GestionarMantenimientoUseC
     private final HerramientaRepositoryPort herramientaRepositoryPort;
     private final ReservaRepositoryPort reservaRepositoryPort;
     private final ControlAcceso controlAcceso;
+    private final FacturaRepositoryPort facturaRepositoryPort;
 
     public GestionarMantenimientoService(
             MantenimientoRepositoryPort mantenimientoRepositoryPort,
             HerramientaRepositoryPort herramientaRepositoryPort,
             ReservaRepositoryPort reservaRepositoryPort,
-            ControlAcceso controlAcceso
+            ControlAcceso controlAcceso,
+            FacturaRepositoryPort facturaRepositoryPort
     ) {
         this.mantenimientoRepositoryPort = mantenimientoRepositoryPort;
         this.herramientaRepositoryPort = herramientaRepositoryPort;
         this.reservaRepositoryPort = reservaRepositoryPort;
         this.controlAcceso = controlAcceso;
+        this.facturaRepositoryPort = facturaRepositoryPort;
     }
 
     @Override
@@ -71,6 +75,7 @@ public class GestionarMantenimientoService implements GestionarMantenimientoUseC
 
         mantenimiento.cerrar(costoReparacion);
         Mantenimiento cerrado = mantenimientoRepositoryPort.guardar(mantenimiento);
+        liquidarDepositoPorDano(cerrado);
 
         // Solo vuelve a estar disponible si seguía en mantenimiento; si mientras tanto se marcó
         // FUERA_DE_SERVICIO (por ejemplo, irreparable) conserva ese estado.
@@ -79,6 +84,26 @@ public class GestionarMantenimientoService implements GestionarMantenimientoUseC
             herramientaRepositoryPort.guardar(herramienta);
         }
         return cerrado;
+    }
+
+    /**
+     * Si el mantenimiento nació de una devolución con daño, su costo real se descuenta del depósito de esa reserva,
+     * que estaba PENDIENTE_REPARACION, y la factura muestra la liquidación.
+     */
+    private void liquidarDepositoPorDano(Mantenimiento cerrado) {
+        if (cerrado.getReservaId() == null) {
+            return;
+        }
+        reservaRepositoryPort.buscarPorId(cerrado.getReservaId())
+                .filter(reserva -> reserva.getGarantia().pendienteReparacion())
+                .ifPresent(reserva -> {
+                    reserva.liquidarReparacion(cerrado.getCostoReparacion());
+                    reservaRepositoryPort.guardar(reserva);
+                    facturaRepositoryPort.buscarPorReservaId(reserva.getId()).ifPresent(factura -> {
+                        factura.registrarLiquidacion(reserva.getGarantia());
+                        facturaRepositoryPort.guardar(factura);
+                    });
+                });
     }
 
     @Override

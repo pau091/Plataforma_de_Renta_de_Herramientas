@@ -1,7 +1,7 @@
 // Vistas del ADMIN: panel global, usuarios, inventario, categorías, alquileres, pagos, incidencias y reportes.
 import { api, conParametros } from '../api.js';
 import {
-    abrirModal, badge, barrasPorEstado, cargando, confirmar, fmtInstante, fmtMoneda, html, kpi, opciones,
+    abrirModal, badge, barrasPorEstado, cargando, confirmar, fmtFecha, fmtInstante, fmtMoneda, html, kpi, opciones,
     raw, toast, toastError, vacio,
 } from '../ui.js';
 import {
@@ -378,14 +378,19 @@ export const facturas = contenedor => vistaFacturas(contenedor, {
 export function reportes(contenedor) {
     return conDatos(contenedor, () => Promise.all([
         api.get('/reportes/ingresos'), api.get('/reportes/rentabilidad'), api.get('/reportes/herramientas-mas-alquiladas'),
-        api.get('/reportes/clientes-frecuentes'), api.get('/reportes/disponibilidad'),
-    ]), ([ingresos, rentabilidad, masAlquiladas, frecuentes, disponibilidad]) => {
+        api.get('/reportes/clientes-frecuentes'), api.get('/reportes/disponibilidad'), api.get('/reportes/multas'),
+    ]), ([ingresos, rentabilidad, masAlquiladas, frecuentes, disponibilidad, multas]) => {
         const margen = valor => (valor === null || valor === undefined ? '—' : `${valor.toFixed(1)} %`);
         contenedor.innerHTML = html`${encabezado('Reportes', 'Rentabilidad y uso de las herramientas.')}
             <div class="row g-3 mb-4">${kpi('Ingresos', fmtMoneda(rentabilidad.ingresosTotales), 'cash-coin', 'success')}
                 ${kpi('Costo de mantenimiento', fmtMoneda(rentabilidad.costoMantenimientoTotal), 'wrench', 'danger')}
                 ${kpi('Utilidad', fmtMoneda(rentabilidad.utilidadTotal), 'graph-up-arrow', 'primary')}
                 ${kpi('Margen', margen(rentabilidad.margenPorcentaje), 'percent', 'warning')}</div>
+            <div class="row g-3 mb-4">
+                ${kpi('Alquileres', fmtMoneda(ingresos.ingresosAlquiler), 'calendar-check', 'success')}
+                ${kpi('Multas por retraso', fmtMoneda(ingresos.ingresosMultas), 'alarm', 'danger')}
+                ${kpi('Depósitos en custodia', fmtMoneda(ingresos.depositosEnCustodia), 'shield-lock', 'secondary')}
+                ${kpi('Saldo por cobrar', fmtMoneda(ingresos.saldoPendientePorCobrar), 'exclamation-circle', 'warning')}</div>
             <div class="row g-3 mb-4">
                 <div class="col-lg-6"><h3 class="h6">Ingresos por método de pago</h3>
                     ${tabla(['Método', { texto: 'Pagos', clase: 'text-end' }, { texto: 'Total', clase: 'text-end' }],
@@ -397,6 +402,14 @@ export function reportes(contenedor) {
                         <tr><td>${badge('MANTENIMIENTO')}</td><td class="text-end">${disponibilidad.enMantenimiento}</td></tr>
                         <tr><td>${badge('FUERA_DE_SERVICIO')}</td><td class="text-end">${disponibilidad.fueraDeServicio}</td></tr>
                         <tr class="fw-semibold"><td>Total</td><td class="text-end">${disponibilidad.total}</td></tr>`)}</div></div>
+            <h3 class="h6">Devoluciones tardías y multas <span class="badge text-bg-danger">${multas.devolucionesTardias}</span></h3>
+            <div class="mb-4">${multas.items.length ? tabla(['Herramienta', 'Cliente', 'Debía devolverse', { texto: 'Días de retraso', clase: 'text-end' },
+                { texto: 'Multa', clase: 'text-end' }, { texto: 'Depósito devuelto', clase: 'text-end' }, { texto: 'Saldo pendiente', clase: 'text-end' }],
+                multas.items.map(m => html`<tr><td class="fw-semibold">${m.herramientaNombre}</td><td>${m.clienteNombre}</td>
+                    <td>${fmtFecha(m.fechaFin)}</td><td class="text-end">${m.diasRetraso}</td>
+                    <td class="text-end text-danger">${fmtMoneda(m.multa)}</td><td class="text-end">${fmtMoneda(m.depositoDevuelto)}</td>
+                    <td class="text-end ${m.saldoPendiente > 0 ? 'text-danger fw-semibold' : ''}">${fmtMoneda(m.saldoPendiente)}</td></tr>`))
+                : vacio('No hay devoluciones tardías.', 'check-circle')}</div>
             <h3 class="h6">Rentabilidad por herramienta</h3>
             <div class="mb-4">${tabla(['Herramienta', 'Proveedor', { texto: 'Alquileres', clase: 'text-end' }, { texto: 'Ingresos', clase: 'text-end' },
                 { texto: 'Mantenimiento', clase: 'text-end' }, { texto: 'Utilidad', clase: 'text-end' }, { texto: 'Margen', clase: 'text-end' }],

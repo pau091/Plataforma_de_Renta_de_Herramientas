@@ -5,6 +5,7 @@ import com.example.tomcat.port.in.dto.ReporteDisponibilidad;
 import com.example.tomcat.port.in.dto.ReporteHerramientasMasAlquiladas;
 import com.example.tomcat.port.in.dto.ReporteIncidencias;
 import com.example.tomcat.port.in.dto.ReporteIngresos;
+import com.example.tomcat.port.in.dto.ReporteMultas;
 import com.example.tomcat.port.in.dto.ReporteRentabilidad;
 
 public interface ConsultarReportesUseCase {
@@ -14,4 +15,5 @@ public interface ConsultarReportesUseCase {
     ReporteDisponibilidad disponibilidad();
     ReporteRentabilidad rentabilidad();
     ReporteIncidencias incidencias();
+    ReporteMultas multas();
 }
