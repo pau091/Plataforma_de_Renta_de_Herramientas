@@ -8,14 +8,21 @@ import com.example.tomcat.port.out.PasswordHasherPort;
 import com.example.tomcat.repository.UsuarioRepositoryPort;
 import com.example.tomcat.valueobject.Email;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+
 public class AutenticarUsuarioService implements AutenticarUsuarioUseCase {
 
     private final UsuarioRepositoryPort usuarioRepositoryPort;
     private final PasswordHasherPort passwordHasherPort;
+    private final Clock reloj;
 
-    public AutenticarUsuarioService(UsuarioRepositoryPort usuarioRepositoryPort, PasswordHasherPort passwordHasherPort) {
+    public AutenticarUsuarioService(UsuarioRepositoryPort usuarioRepositoryPort, PasswordHasherPort passwordHasherPort,
+                                    Clock reloj) {
         this.usuarioRepositoryPort = usuarioRepositoryPort;
         this.passwordHasherPort = passwordHasherPort;
+        this.reloj = reloj;
     }
 
     @Override
@@ -35,6 +42,10 @@ public class AutenticarUsuarioService implements AutenticarUsuarioUseCase {
 
         if (!usuario.isActivo()) {
             throw new UsuarioInactivoException();
+        }
+        LocalDateTime ahora = LocalDateTime.ofInstant(reloj.instant(), ZoneOffset.UTC);
+        if (usuario.estaSancionado(ahora)) {
+            throw new UsuarioInactivoException(usuario.mensajeSancion(ahora, reloj.getZone()));
         }
 
         return usuario;

@@ -35,6 +35,15 @@ public class UsuarioEntity {
     )
     private Set<RolEntity> roles = new HashSet<>();
 
+    @Column(name = "suspendido_hasta")
+    private LocalDateTime suspendidoHasta;
+
+    @Column(nullable = false)
+    private boolean baneado;
+
+    @Column(name = "motivo_sancion")
+    private String motivoSancion;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getNombre() { return nombre; }
@@ -49,4 +58,10 @@ public class UsuarioEntity {
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public Set<RolEntity> getRoles() { return roles; }
     public void setRoles(Set<RolEntity> roles) { this.roles = roles; }
+    public LocalDateTime getSuspendidoHasta() { return suspendidoHasta; }
+    public void setSuspendidoHasta(LocalDateTime suspendidoHasta) { this.suspendidoHasta = suspendidoHasta; }
+    public boolean isBaneado() { return baneado; }
+    public void setBaneado(boolean baneado) { this.baneado = baneado; }
+    public String getMotivoSancion() { return motivoSancion; }
+    public void setMotivoSancion(String motivoSancion) { this.motivoSancion = motivoSancion; }
 }

@@ -15,8 +15,10 @@ import com.example.tomcat.port.in.GestionarUsuarioUseCase;
 import com.example.tomcat.port.in.ListarPagosUseCase;
 import com.example.tomcat.port.in.ProcesarPagoUseCase;
 import com.example.tomcat.port.in.RegistrarUsuarioUseCase;
+import com.example.tomcat.port.in.SancionarUsuarioUseCase;
 import com.example.tomcat.port.in.VencerReservasUseCase;
 import com.example.tomcat.port.out.AlmacenamientoImagenPort;
+import com.example.tomcat.port.out.ListaNegraTokensPort;
 import com.example.tomcat.port.out.PasswordHasherPort;
 import com.example.tomcat.repository.CategoriaRepositoryPort;
 import com.example.tomcat.repository.FacturaRepositoryPort;
@@ -42,6 +44,7 @@ import com.example.tomcat.service.ListarPagosService;
 import com.example.tomcat.service.PoliticaVencimiento;
 import com.example.tomcat.service.ProcesarPagoService;
 import com.example.tomcat.service.RegistrarUsuarioService;
+import com.example.tomcat.service.SancionarUsuarioService;
 import com.example.tomcat.service.VencerReservasService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -97,10 +100,11 @@ public class BeanConfig {
     @Bean
     public AutenticarUsuarioUseCase autenticarUsuarioUseCase(
             UsuarioRepositoryPort usuarioRepository,
-            PasswordHasherPort passwordHasherPort
+            PasswordHasherPort passwordHasherPort,
+            Clock reloj
     ) {
         return TransaccionalProxy.envolver(AutenticarUsuarioUseCase.class,
-                new AutenticarUsuarioService(usuarioRepository, passwordHasherPort), tx, LECTURA);
+                new AutenticarUsuarioService(usuarioRepository, passwordHasherPort, reloj), tx, LECTURA);
     }
 
     @Bean
@@ -109,12 +113,23 @@ public class BeanConfig {
             HerramientaRepositoryPort herramientaRepository,
             ReservaRepositoryPort reservaRepository,
             PasswordHasherPort passwordHasherPort,
+            ListaNegraTokensPort listaNegraTokensPort,
             @Value("${app.admin-principal}") String emailAdminPrincipal
     ) {
         return TransaccionalProxy.envolver(GestionarUsuarioUseCase.class,
                 new GestionarUsuarioService(usuarioRepository, herramientaRepository, reservaRepository, passwordHasherPort,
-                        emailAdminPrincipal),
+                        listaNegraTokensPort, emailAdminPrincipal),
                 tx, ESCRITURA);
+    }
+
+    @Bean
+    public SancionarUsuarioUseCase sancionarUsuarioUseCase(
+            UsuarioRepositoryPort usuarioRepository,
+            ListaNegraTokensPort listaNegraTokensPort,
+            Clock reloj
+    ) {
+        return TransaccionalProxy.envolver(SancionarUsuarioUseCase.class,
+                new SancionarUsuarioService(usuarioRepository, listaNegraTokensPort, reloj), tx, ESCRITURA);
     }
 
     @Bean

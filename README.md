@@ -8,7 +8,7 @@ devoluciones con daños y la rentabilidad de la plataforma.
 - **Base de datos:** MySQL 8 con migraciones Flyway, scripts SQL y datos de demostración (20 o más registros por entidad).
 - **Frontend:** HTML, CSS y JavaScript puro con Bootstrap 5, responsivo, con un panel distinto para cada rol.
 - **Despliegue:** WAR en **Apache Tomcat 11** (con Docker Compose o en un Tomcat instalado).
-- **Documentación y pruebas:** Swagger con ejemplos JSON, colección de Postman y 190 pruebas automatizadas.
+- **Documentación y pruebas:** Swagger con ejemplos JSON, colección de Postman y 204 pruebas automatizadas.
 
 ---
 
@@ -81,7 +81,7 @@ infraestructura → Spring Boot: controllers REST, seguridad JWT, JPA, Flyway, c
 │   ├── java/.../adapter/out/            Entidades JPA, repositorios Spring Data, mappers, almacenamiento en disco
 │   ├── java/.../security/               Filtro JWT, configuración de Spring Security, errores 401/403 en JSON
 │   ├── java/.../config/                 Cableado de casos de uso, transacciones, CORS, Swagger, vencimiento programado
-│   ├── resources/db/migration/          Migraciones Flyway V1–V13
+│   ├── resources/db/migration/          Migraciones Flyway V1–V14
 │   └── resources/static/                Frontend (index.html, css/, js/, images/)
 ├── sql/                schema.sql y data.sql (creación y población de la base)
 ├── docs/               Diagrama relacional (imagen y fuente Mermaid)
@@ -291,7 +291,9 @@ La fuente editable del diagrama está en [`docs/diagrama-er.mmd`](docs/diagrama-
 - Un **proveedor** tiene muchas **herramientas**, y cada herramienta pertenece a una **categoría**.
 - Un **cliente** tiene muchas **reservas** sobre herramientas. Cada reserva tiene **pagos**, y cada pago genera una **factura**.
 - Una herramienta tiene **mantenimientos**. Los que nacen de una devolución con daño quedan ligados a la reserva.
-- Las llaves foráneas usan `RESTRICT`: nunca se borra historial en cascada.
+- `tokens_emitidos` y `tokens_revocados` (la lista negra) guardan los `jti` de los JWT para poder expulsar al instante a un
+  usuario suspendido o baneado. Son datos técnicos: se borran en cascada con el usuario y se limpian al expirar.
+- Las llaves foráneas del negocio usan `RESTRICT`: nunca se borra historial en cascada.
 - Restricciones `CHECK` validan estados, montos, tarifas y fechas.
 - Hay índices en todas las llaves foráneas, en los estados (usados por el vencimiento automático) y uno compuesto para
   validar el cruce de fechas.
@@ -300,9 +302,9 @@ La fuente editable del diagrama está en [`docs/diagrama-er.mmd`](docs/diagrama-
 
 | Archivo | Contenido |
 |---|---|
-| [`sql/schema.sql`](sql/schema.sql) | Creación de la base y de las 9 tablas, con llaves, restricciones e índices |
+| [`sql/schema.sql`](sql/schema.sql) | Creación de la base y de las 11 tablas, con llaves, restricciones e índices |
 | [`sql/data.sql`](sql/data.sql) | Datos de demostración |
-| `infraestructura/src/main/resources/db/migration/V1…V13` | Las mismas definiciones como migraciones Flyway: la aplicación las aplica sola al arrancar |
+| `infraestructura/src/main/resources/db/migration/V1…V14` | Las mismas definiciones como migraciones Flyway: la aplicación las aplica sola al arrancar |
 
 Para crear la base a mano:
 
@@ -344,6 +346,7 @@ Si después arranca la aplicación sobre esa base, Flyway la reconoce como versi
    ```
 4. En cada petición, el filtro `JwtAuthenticationFilter` hace lo siguiente:
    - verifica la firma y la vigencia del token;
+   - revisa la **lista negra**: si el token fue revocado (suspensión, baneo, desactivación o cierre de sesión), lo rechaza con 401;
    - **consulta la base de datos**: si el usuario fue desactivado o eliminado, el token deja de servir de inmediato, aunque no haya expirado;
    - toma el rol de la base de datos, no del token.
 5. Spring Security restringe cada ruta por rol. Además, los casos de uso verifican la **propiedad**: un proveedor solo gestiona
@@ -392,6 +395,26 @@ Reglas:
   Sí puede ascender a ADMIN.
 - Si el usuario ya tiene ese rol, o el rol no es válido, responde `400`.
 
+### Suspensión, baneo y lista negra de tokens
+
+El administrador puede **suspender** (de 1 a 365 días) o **banear** (indefinidamente) a un proveedor o cliente
+conflictivo, siempre con un motivo. El usuario queda **expulsado al instante**, sin esperar a que su token expire:
+
+1. Cada token JWT lleva un identificador único (`jti`), que se guarda en `tokens_emitidos` al iniciar sesión.
+2. Al suspender o banear, **todos** los tokens vigentes del usuario se copian a `tokens_revocados`: la **lista negra**.
+3. En cada petición, `JwtAuthenticationFilter` busca el `jti` en la lista negra (por llave primaria). Si está, responde
+   `401` con el motivo ("Su sesión fue revocada. Cuenta suspendida: ..."). La página lo devuelve al login mostrando ese mensaje.
+4. Mientras dure la sanción, el login responde `403` con la fecha de fin y el motivo.
+5. Al reactivarlo (`POST /api/usuarios/{id}/reactivacion`), o cuando termina la suspensión, puede volver a entrar. Sus tokens
+   anteriores **siguen revocados**: debe iniciar sesión otra vez.
+
+La lista negra también se usa al **desactivar** una cuenta (`activo=false`) y al **cerrar sesión** (`POST /api/auth/logout`,
+que revoca solo ese token). Una tarea programada borra cada hora los tokens ya expirados, que de todos modos no pasarían la
+validación de vigencia.
+
+**¿Por qué MySQL y no Redis?** Para no agregar otro servicio a Docker. La lista negra está detrás del puerto
+`ListaNegraTokensPort`: cambiarla a Redis (clave = `jti`, con expiración automática) solo requeriría otro adaptador.
+
 ### El proveedor también alquila
 
 Un proveedor puede reservar y pagar herramientas **de otros proveedores**, igual que un cliente. En la página tiene el grupo
@@ -419,6 +442,8 @@ Reservar una herramienta propia responde `400` ("No puede reservar sus propias h
 | Mantenimientos | | | ✅ de sus herramientas | ✅ |
 | Usuarios, categorías (escritura) y reportes | | | | ✅ |
 | Cambiar el rol de un usuario | | | | ✅ solo el admin principal |
+| Suspender, banear y reactivar proveedores y clientes | | | | ✅ |
+| Cerrar sesión (`/api/auth/logout`) | | ✅ | ✅ | ✅ |
 | Panel (`/api/panel`) | | ✅ | ✅ | ✅ |
 
 ---
@@ -434,10 +459,14 @@ endpoint con su descripción, los roles permitidos, ejemplos JSON de petición y
 |---|---|---|---|
 | POST | `/api/auth/registro` | Registrar un cliente (devuelve token) | Público |
 | POST | `/api/auth/login` | Iniciar sesión | Público |
+| POST | `/api/auth/logout` | Cerrar sesión: el token pasa a la lista negra | Autenticado |
 | POST | `/api/usuarios` | Registrar un proveedor o cliente | Admin |
 | GET | `/api/usuarios[?rol=]`, `/api/usuarios/clientes`, `/api/usuarios/proveedores` | Listar usuarios | Admin |
 | GET / PUT / DELETE | `/api/usuarios/{id}` | Consultar, editar o desactivar (`activo=false`), eliminar | Admin |
 | PATCH | `/api/usuarios/{id}/rol` | Ascender o bajar de rango (CLIENTE, PROVEEDOR, ADMIN) | Admin principal |
+| POST | `/api/usuarios/{id}/suspension` | Suspender N días y expulsar de inmediato | Admin |
+| POST | `/api/usuarios/{id}/baneo` | Banear (indefinido) y expulsar de inmediato | Admin |
+| POST | `/api/usuarios/{id}/reactivacion` | Levantar la suspensión o el baneo | Admin |
 | GET | `/api/categorias`, `/api/categorias/{id}` | Consultar categorías | Todos |
 | POST / PUT / DELETE | `/api/categorias[/{id}]` | Crear, editar, eliminar | Admin |
 | GET | `/api/herramientas[?categoriaId&disponibles&proveedorId&q]` | Catálogo con filtros combinables | Todos |
@@ -648,9 +677,9 @@ En Windows PowerShell use `.\mvnw.cmd test` y `.\mvnw.cmd verify`.
 
 | Tipo | Ubicación | Cantidad | Qué cubre |
 |---|---|---|---|
-| Unitarias de dominio | `domain/src/test` | 76 | Ciclo de vida de la reserva, vencimiento, cancelación, devolución, pagos, facturas, herramientas y objetos de valor |
-| Unitarias de servicios | `application/src/test` | 59 | Reglas de negocio y de acceso por rol con Mockito y un reloj fijo (reservas, pagos, reembolsos, cambio de rol, autenticación, reportes, imágenes) |
-| Integración | `infraestructura/src/test` (`*IT`) | 55 | La aplicación completa contra un **MySQL 8.4 real en Docker** (Testcontainers): migraciones, seguridad JWT y permisos, cambio de rol, proveedor que alquila, flujos completos por HTTP, concurrencia (peticiones simultáneas), imágenes (incluidas las fotos de demostración), CRUD y restricciones de la base |
+| Unitarias de dominio | `domain/src/test` | 80 | Ciclo de vida de la reserva, vencimiento, cancelación, devolución, pagos, facturas, herramientas, usuarios (suspensión y baneo) y objetos de valor |
+| Unitarias de servicios | `application/src/test` | 65 | Reglas de negocio y de acceso por rol con Mockito y un reloj fijo (reservas, pagos, reembolsos, cambio de rol, sanciones, autenticación, reportes, imágenes) |
+| Integración | `infraestructura/src/test` (`*IT`) | 59 | La aplicación completa contra un **MySQL 8.4 real en Docker** (Testcontainers): migraciones, seguridad JWT y permisos, lista negra de tokens, cambio de rol, proveedor que alquila, flujos completos por HTTP, concurrencia (peticiones simultáneas), imágenes (incluidas las fotos de demostración), CRUD y restricciones de la base |
 
 - Las pruebas de integración arrancan su propio MySQL temporal; no usan la base de Docker Compose.
 - Si Docker no está disponible, se **omiten** en lugar de fallar.

@@ -1,5 +1,5 @@
 // Punto de entrada: sesión, menú según el rol y navegación por "#/ruta".
-import { EVENTO_SESION_EXPIRADA, sesion } from './api.js';
+import { EVENTO_SESION_EXPIRADA, api, sesion } from './api.js';
 import { html, toast } from './ui.js';
 import { vistaAcceso } from './vistas/auth.js';
 import * as admin from './vistas/admin.js';
@@ -76,7 +76,7 @@ function pintarAplicacion(usuario) {
             </aside>
             <main class="flex-grow-1 p-3 p-md-4 contenido" id="vista"></main>
         </div>`;
-    raiz.querySelector('[data-salir]').addEventListener('click', () => cerrarSesion());
+    raiz.querySelector('[data-salir]').addEventListener('click', salir);
     // En móvil, al elegir una opción se cierra el menú.
     raiz.querySelectorAll('#menu .nav-link').forEach(enlace => enlace.addEventListener('click', () => {
         bootstrap.Offcanvas.getInstance(document.getElementById('menu'))?.hide();
@@ -115,6 +115,16 @@ function iniciar(aviso) {
     }
     pintarAplicacion(usuario);
     navegar();
+}
+
+/** "Cerrar sesión": el servidor revoca el token (lista negra) y luego se borra la sesión del navegador. */
+async function salir() {
+    try {
+        await api.post('/auth/logout');
+    } catch {
+        // Si el token ya no servía, la sesión local se cierra igual (el evento de sesión expirada ya pudo cerrarla).
+    }
+    if (sesion.obtener()) cerrarSesion();
 }
 
 function cerrarSesion(aviso) {

@@ -2,7 +2,7 @@
 -- Plataforma de Renta de Herramientas - Script de creación de la base de datos (MySQL 8)
 -- =====================================================================================================
 -- Esquema final equivalente al que construye Flyway al arrancar la aplicación con las migraciones
--- V1 a V13 (infraestructura/src/main/resources/db/migration). Úselo para crear la base a mano y luego
+-- V1 a V14 (infraestructura/src/main/resources/db/migration). Úselo para crear la base a mano y luego
 -- poblarla con sql/data.sql:
 --     mysql -u root -p < sql/schema.sql
 --     mysql -u root -p < sql/data.sql
@@ -40,7 +40,10 @@ CREATE TABLE usuarios (
     email      VARCHAR(150) NOT NULL UNIQUE,
     password   VARCHAR(255) NOT NULL,
     activo     BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    suspendido_hasta TIMESTAMP NULL,
+    baneado          BOOLEAN NOT NULL DEFAULT FALSE,
+    motivo_sancion   VARCHAR(255) NULL
 );
 
 CREATE TABLE usuario_roles (
@@ -169,3 +172,23 @@ CREATE TABLE facturas (
 );
 CREATE INDEX idx_facturas_cliente_id ON facturas(cliente_id);
 CREATE INDEX idx_facturas_reserva_id ON facturas(reserva_id);
+
+-- Tokens JWT emitidos y lista negra de tokens revocados (suspensión, baneo, desactivación o cierre de sesión).
+CREATE TABLE tokens_emitidos (
+    jti        VARCHAR(36) PRIMARY KEY,
+    usuario_id BIGINT NOT NULL,
+    emitido_en TIMESTAMP NOT NULL,
+    expira_en  TIMESTAMP NOT NULL,
+    CONSTRAINT fk_tokens_emitidos_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_tokens_emitidos_usuario ON tokens_emitidos(usuario_id, expira_en);
+
+CREATE TABLE tokens_revocados (
+    jti         VARCHAR(36) PRIMARY KEY,
+    usuario_id  BIGINT NOT NULL,
+    motivo      VARCHAR(300) NOT NULL,
+    revocado_en TIMESTAMP NOT NULL,
+    expira_en   TIMESTAMP NOT NULL,
+    CONSTRAINT fk_tokens_revocados_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_tokens_revocados_expira ON tokens_revocados(expira_en);

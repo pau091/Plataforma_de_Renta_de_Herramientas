@@ -23,10 +23,10 @@ class MigracionesYDatosIT extends IntegracionBase {
     }
 
     @Test
-    @DisplayName("Flyway aplica todas las migraciones (V1–V13) sin errores")
+    @DisplayName("Flyway aplica todas las migraciones (V1–V14) sin errores")
     void migracionesAplicadas() {
         assertThat(jdbc.queryForObject("SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history WHERE success = 1", Integer.class))
-                .isEqualTo(13);
+                .isEqualTo(14);
         assertThat(contar("SELECT COUNT(*) FROM flyway_schema_history WHERE success = 0")).isZero();
     }
 

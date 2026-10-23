@@ -4,6 +4,8 @@ import com.example.tomcat.model.Usuario;
 import com.example.tomcat.port.in.AutenticarUsuarioUseCase;
 import com.example.tomcat.port.in.RegistrarUsuarioUseCase;
 import com.example.tomcat.security.JwtTokenProvider;
+import com.example.tomcat.security.ListaNegraTokensAdapter;
+import com.example.tomcat.security.UsuarioAutenticado;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -12,8 +14,11 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import io.swagger.v3.oas.annotations.Parameter;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "Autenticación")
@@ -24,15 +29,18 @@ public class AuthController {
     private final RegistrarUsuarioUseCase registrarUsuarioUseCase;
     private final AutenticarUsuarioUseCase autenticarUsuarioUseCase;
     private final JwtTokenProvider jwtTokenProvider;
+    private final ListaNegraTokensAdapter listaNegraTokens;
 
     public AuthController(
             RegistrarUsuarioUseCase registrarUsuarioUseCase,
             AutenticarUsuarioUseCase autenticarUsuarioUseCase,
-            JwtTokenProvider jwtTokenProvider
+            JwtTokenProvider jwtTokenProvider,
+            ListaNegraTokensAdapter listaNegraTokens
     ) {
         this.registrarUsuarioUseCase = registrarUsuarioUseCase;
         this.autenticarUsuarioUseCase = autenticarUsuarioUseCase;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.listaNegraTokens = listaNegraTokens;
     }
 
     /** Registro público: siempre crea una cuenta CLIENTE. El campo rol es opcional y solo admite CLIENTE. */
@@ -61,15 +69,31 @@ public class AuthController {
     @ApiResponse(responseCode = "200", description = "Credenciales correctas")
     @ApiResponse(responseCode = "400", description = "La petición tiene datos inválidos.")
     @ApiResponse(responseCode = "401", description = "Credenciales inválidas.")
-    @ApiResponse(responseCode = "403", description = "El usuario está inactivo. Contacte al administrador de la plataforma.")
+    @ApiResponse(responseCode = "403", description = "El usuario está inactivo, suspendido (indica hasta cuándo y el motivo) o baneado.")
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         Usuario usuario = autenticarUsuarioUseCase.autenticar(request.email(), request.password());
         return ResponseEntity.ok(toAuthResponse(usuario));
     }
 
+    @Operation(summary = "Cerrar sesión",
+            description = "Revoca el token con el que se hace la petición: pasa a la **lista negra** y deja de servir de "
+                    + "inmediato, aunque no haya expirado. Los demás tokens del usuario (otras sesiones) siguen activos.")
+    @ApiResponse(responseCode = "204", description = "Sesión cerrada; el token quedó revocado")
+    @ApiResponse(responseCode = "401", description = "Falta el token o ya no es válido.")
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal UsuarioAutenticado usuario,
+                                       @Parameter(hidden = true) @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        jwtTokenProvider.leer(authorization.substring("Bearer ".length())).ifPresent(datos ->
+                listaNegraTokens.revocar(datos.jti(), usuario.id(), datos.expiraEn(), "Cierre de sesión"));
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Firma el token y registra su jti, para poder revocarlo si el usuario es suspendido o baneado. */
     private AuthResponse toAuthResponse(Usuario usuario) {
-        String token = jwtTokenProvider.generarToken(usuario.getEmail(), usuario.getRol(), usuario.getId());
+        JwtTokenProvider.TokenGenerado generado = jwtTokenProvider.generarToken(usuario.getEmail(), usuario.getRol(), usuario.getId());
+        listaNegraTokens.registrarEmision(generado, usuario.getId());
+        String token = generado.token();
         return new AuthResponse(
                 token,
                 usuario.getId(),

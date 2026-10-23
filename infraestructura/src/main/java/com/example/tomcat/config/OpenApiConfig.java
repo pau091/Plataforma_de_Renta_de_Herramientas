@@ -55,6 +55,8 @@ public class OpenApiConfig {
             El token se firma con HS512 y dura **24 horas**. Contiene el correo (`sub`), el `rol` y el `usuarioId`. \
             En cada petición el servidor verifica la firma y además consulta la base de datos: si el usuario fue \
             desactivado o eliminado, el token deja de servir aunque no haya expirado. El rol efectivo es el de la base de datos.
+            Cada token tiene un id único (`jti`); si el usuario es **suspendido o baneado**, o cierra sesión con
+            `POST /api/auth/logout`, el token pasa a una **lista negra** y se rechaza de inmediato con 401.
 
             ## Roles
             | Rol | Puede |

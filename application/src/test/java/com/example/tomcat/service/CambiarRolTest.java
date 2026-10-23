@@ -7,6 +7,7 @@ import com.example.tomcat.exception.RecursoNoEncontradoException;
 import com.example.tomcat.model.Rol;
 import com.example.tomcat.model.Usuario;
 import com.example.tomcat.port.in.dto.Solicitante;
+import com.example.tomcat.port.out.ListaNegraTokensPort;
 import com.example.tomcat.port.out.PasswordHasherPort;
 import com.example.tomcat.repository.HerramientaRepositoryPort;
 import com.example.tomcat.repository.ReservaRepositoryPort;
@@ -47,12 +48,14 @@ class CambiarRolTest {
     ReservaRepositoryPort reservas;
     @Mock
     PasswordHasherPort hasher;
+    @Mock
+    ListaNegraTokensPort listaNegra;
 
     GestionarUsuarioService servicio;
 
     @BeforeEach
     void preparar() {
-        servicio = new GestionarUsuarioService(usuarios, herramientas, reservas, hasher, PRINCIPAL);
+        servicio = new GestionarUsuarioService(usuarios, herramientas, reservas, hasher, listaNegra, PRINCIPAL);
         existe(new Usuario(ADMIN_ID, "Administrador General", PRINCIPAL, "hash", true, null, Rol.ADMIN));
         existe(new Usuario(OTRO_ADMIN_ID, "Admin Ascendido", "ascendido@correo.com", "hash", true, null, Rol.ADMIN));
         existe(usuario(CLIENTE_ID, "Juan", Rol.CLIENTE, true));

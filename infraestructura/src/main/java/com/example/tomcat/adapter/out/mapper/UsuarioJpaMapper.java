@@ -23,7 +23,10 @@ public class UsuarioJpaMapper {
                 entity.getPassword(),
                 entity.isActivo(),
                 entity.getCreatedAt(),
-                rol
+                rol,
+                entity.getSuspendidoHasta(),
+                entity.isBaneado(),
+                entity.getMotivoSancion()
         );
     }
 
@@ -32,6 +35,9 @@ public class UsuarioJpaMapper {
         entity.setEmail(usuario.getEmail());
         entity.setPassword(usuario.getPassword());
         entity.setActivo(usuario.isActivo());
+        entity.setSuspendidoHasta(usuario.getSuspendidoHasta());
+        entity.setBaneado(usuario.isBaneado());
+        entity.setMotivoSancion(usuario.getMotivoSancion());
         if (usuario.getCreatedAt() != null) {
             entity.setCreatedAt(usuario.getCreatedAt());
         }

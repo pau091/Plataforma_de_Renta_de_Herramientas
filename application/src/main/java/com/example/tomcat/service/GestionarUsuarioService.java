@@ -8,6 +8,7 @@ import com.example.tomcat.model.Rol;
 import com.example.tomcat.model.Usuario;
 import com.example.tomcat.port.in.GestionarUsuarioUseCase;
 import com.example.tomcat.port.in.dto.Solicitante;
+import com.example.tomcat.port.out.ListaNegraTokensPort;
 import com.example.tomcat.port.out.PasswordHasherPort;
 import com.example.tomcat.repository.HerramientaRepositoryPort;
 import com.example.tomcat.repository.ReservaRepositoryPort;
@@ -22,6 +23,7 @@ public class GestionarUsuarioService implements GestionarUsuarioUseCase {
     private final HerramientaRepositoryPort herramientaRepositoryPort;
     private final ReservaRepositoryPort reservaRepositoryPort;
     private final PasswordHasherPort passwordHasherPort;
+    private final ListaNegraTokensPort listaNegraTokensPort;
     /** Correo del administrador principal (app.admin-principal): el único que reasigna roles. */
     private final String emailAdminPrincipal;
 
@@ -30,12 +32,14 @@ public class GestionarUsuarioService implements GestionarUsuarioUseCase {
             HerramientaRepositoryPort herramientaRepositoryPort,
             ReservaRepositoryPort reservaRepositoryPort,
             PasswordHasherPort passwordHasherPort,
+            ListaNegraTokensPort listaNegraTokensPort,
             String emailAdminPrincipal
     ) {
         this.usuarioRepositoryPort = usuarioRepositoryPort;
         this.herramientaRepositoryPort = herramientaRepositoryPort;
         this.reservaRepositoryPort = reservaRepositoryPort;
         this.passwordHasherPort = passwordHasherPort;
+        this.listaNegraTokensPort = listaNegraTokensPort;
         this.emailAdminPrincipal = emailAdminPrincipal;
     }
 
@@ -82,8 +86,10 @@ public class GestionarUsuarioService implements GestionarUsuarioUseCase {
         if (activo != null) {
             if (activo) {
                 usuario.activar();
-            } else {
+            } else if (usuario.isActivo()) {
                 usuario.desactivar();
+                // Igual que en una suspensión: sus sesiones abiertas se cierran de inmediato.
+                listaNegraTokensPort.revocarTodos(id, "Cuenta desactivada por el administrador");
             }
         }
         if (password != null && !password.isBlank()) {

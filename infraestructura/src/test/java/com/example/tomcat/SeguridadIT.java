@@ -87,8 +87,9 @@ class SeguridadIT extends IntegracionBase {
 
         esperar(PUT("/api/usuarios/" + id, ADMIN, Map.of("activo", false)), 200);
 
+        // Desactivar también cierra sus sesiones: el token pasa a la lista negra.
         JsonNode r = esperar(get("/api/panel").header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenTemporal), 401);
-        assertThat(r.get("message").asText()).contains("inactivo");
+        assertThat(r.get("message").asText()).contains("revocada").contains("desactivada");
     }
 
     @ParameterizedTest(name = "{0} {1} como {2} → {3}")
