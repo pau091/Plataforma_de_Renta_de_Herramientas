@@ -56,8 +56,33 @@ export function inicio(contenedor, usuario) {
 
 // ================================================================ usuarios
 
+/** Estado real de la cuenta: activa, inactiva, suspendida (hasta cuándo) o baneada, con el motivo de la sanción. */
+function estadoCuenta(u) {
+    const motivo = u.motivoSancion ? html`<div class="small text-muted text-wrap" style="max-width: 260px">${u.motivoSancion}</div>` : '';
+    switch (u.estadoCuenta) {
+        case 'SUSPENDIDA':
+            return html`<span class="badge text-bg-warning">Suspendida</span>
+                <div class="small">hasta ${fmtInstante(u.suspendidoHasta)}</div>${motivo}`;
+        case 'BANEADA':
+            return html`<span class="badge text-bg-danger">Baneada</span>${motivo}`;
+        case 'INACTIVA':
+            return html`<span class="badge text-bg-secondary">Inactiva</span>`;
+        default:
+            return html`<span class="badge text-bg-success">Activa</span>`;
+    }
+}
+
+const sancionado = u => u.estadoCuenta === 'SUSPENDIDA' || u.estadoCuenta === 'BANEADA';
+
+const campoMotivo = ejemplo => html`<div class="col-12"><label class="form-label" for="s-motivo">Motivo</label>
+    <textarea class="form-control" id="s-motivo" name="motivo" rows="2" maxlength="255" placeholder="${ejemplo}" required></textarea>
+    <div class="form-text">El usuario lo verá al ser expulsado y al intentar iniciar sesión.</div></div>`;
+
+const sesionesCerradas = n => (n === 1 ? 'Se cerró 1 sesión abierta al instante.'
+    : n > 1 ? `Se cerraron ${n} sesiones abiertas al instante.` : 'No tenía sesiones abiertas.');
+
 export async function usuarios(contenedor) {
-    contenedor.innerHTML = encabezado('Usuarios', 'Registre y administre proveedores y clientes.', html`
+    contenedor.innerHTML = encabezado('Usuarios', 'Registre y administre proveedores y clientes: edite, suspenda, banee o elimine.', html`
         <select class="form-select" data-rol aria-label="Tipo de usuario" style="min-width: 160px">
             ${opciones([{ id: 'PROVEEDOR', nombre: 'Proveedores' }, { id: 'CLIENTE', nombre: 'Clientes' }], 'PROVEEDOR')}</select>
         <button class="btn btn-warning" data-nuevo><i aria-hidden="true" class="bi bi-person-plus me-1"></i>Nuevo usuario</button>`);
@@ -71,9 +96,16 @@ export async function usuarios(contenedor) {
         lista.innerHTML = tabla(['Nombre', 'Correo', 'Registro', 'Estado', { texto: 'Acciones', clase: 'text-end' }],
             datos.map(u => html`<tr>
                 <td class="fw-semibold">${u.nombre}</td><td>${u.email}</td><td class="text-nowrap">${fmtInstante(u.createdAt)}</td>
-                <td>${u.activo ? html`<span class="badge text-bg-success">Activo</span>` : html`<span class="badge text-bg-secondary">Inactivo</span>`}</td>
+                <td>${estadoCuenta(u)}</td>
                 <td class="text-end text-nowrap">
                     <button class="btn btn-sm btn-outline-secondary" data-accion="editar" data-id="${u.id}" title="Editar"><i aria-hidden="true" class="bi bi-pencil"></i></button>
+                    ${sancionado(u)
+                        ? html`<button class="btn btn-sm btn-outline-success" data-accion="reactivar" data-id="${u.id}" title="Levantar la sanción">
+                            <i aria-hidden="true" class="bi bi-unlock"></i></button>`
+                        : html`<button class="btn btn-sm btn-outline-warning" data-accion="suspender" data-id="${u.id}" title="Suspender">
+                            <i aria-hidden="true" class="bi bi-pause-circle"></i></button>
+                          <button class="btn btn-sm btn-outline-danger" data-accion="banear" data-id="${u.id}" title="Banear">
+                            <i aria-hidden="true" class="bi bi-ban"></i></button>`}
                     <button class="btn btn-sm btn-outline-${u.activo ? 'warning' : 'success'}" data-accion="activo" data-id="${u.id}"
                         title="${u.activo ? 'Desactivar' : 'Activar'}"><i aria-hidden="true" class="bi bi-${u.activo ? 'person-slash' : 'person-check'}"></i></button>
                     <button class="btn btn-sm btn-outline-danger" data-accion="eliminar" data-id="${u.id}" title="Eliminar"><i aria-hidden="true" class="bi bi-trash"></i></button></td></tr>`));
@@ -123,6 +155,39 @@ export async function usuarios(contenedor) {
                     { textoConfirmar: u.activo ? 'Desactivar' : 'Activar', color: u.activo ? 'danger' : 'success' })) {
                     await api.put(`/usuarios/${u.id}`, { activo: !u.activo });
                     toast(`Usuario ${u.activo ? 'desactivado' : 'activado'}.`);
+                    await recargar();
+                }
+            } else if (boton.dataset.accion === 'suspender') {
+                abrirModal({
+                    titulo: `Suspender a ${u.nombre}`, textoConfirmar: 'Suspender', colorConfirmar: 'warning',
+                    cuerpo: html`<p class="small text-muted">No podrá iniciar sesión durante el plazo, y si está usando la plataforma
+                        será expulsado de inmediato. Al terminar el plazo podrá volver a entrar.</p>
+                        <div class="row g-3"><div class="col-sm-5"><label class="form-label" for="s-dias">Días</label>
+                            <input type="number" class="form-control" id="s-dias" name="dias" min="1" max="365" value="7" required></div>
+                        ${campoMotivo('Cancelaciones reiteradas sin aviso')}</div>`,
+                    alConfirmar: async (form, datos) => {
+                        const r = await api.post(`/usuarios/${u.id}/suspension`, { dias: Number(datos.dias), motivo: datos.motivo });
+                        toast(`${u.nombre} suspendido por ${datos.dias} día(s). ${sesionesCerradas(r.tokensRevocados)}`, 'warning');
+                        await recargar();
+                    },
+                });
+            } else if (boton.dataset.accion === 'banear') {
+                abrirModal({
+                    titulo: `Banear a ${u.nombre}`, textoConfirmar: 'Banear', colorConfirmar: 'danger',
+                    cuerpo: html`<p class="small text-muted">Bloqueo <strong>indefinido</strong>: no podrá entrar hasta que un administrador
+                        lo reactive, y si está usando la plataforma será expulsado de inmediato.</p>
+                        <div class="row g-3">${campoMotivo('Fraude en pagos')}</div>`,
+                    alConfirmar: async (form, datos) => {
+                        const r = await api.post(`/usuarios/${u.id}/baneo`, { motivo: datos.motivo });
+                        toast(`${u.nombre} baneado. ${sesionesCerradas(r.tokensRevocados)}`, 'danger');
+                        await recargar();
+                    },
+                });
+            } else if (boton.dataset.accion === 'reactivar') {
+                if (await confirmar(`¿Levantar la ${u.estadoCuenta === 'BANEADA' ? 'prohibición' : 'suspensión'} de ${u.nombre}? `
+                    + 'Podrá volver a iniciar sesión.', { titulo: 'Reactivar usuario', textoConfirmar: 'Reactivar', color: 'success' })) {
+                    await api.post(`/usuarios/${u.id}/reactivacion`);
+                    toast(`${u.nombre} puede volver a iniciar sesión.`);
                     await recargar();
                 }
             } else if (boton.dataset.accion === 'eliminar') {
