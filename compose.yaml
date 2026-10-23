@@ -25,7 +25,7 @@ services:
     container_name: tomcat_rentas
     ports:
       # Si el 8080 ya está ocupado (p. ej. un Tomcat instalado en el sistema): APP_PORT=8081 docker compose up -d
-      - "${APP_PORT:-8080}:8080"
+      - "${APP_PORT:-8081}:8080"
     environment:
       - DB_URL=jdbc:mysql://mysql:3306/renta_herramientas_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       - DB_USERNAME=mysql
